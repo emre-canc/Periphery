@@ -1,0 +1,153 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
+#include "MissionStructs.h"
+#include "MissionData.h"
+
+#include "Engine/DataTable.h"
+#include "GameFramework/Actor.h"
+#include "Subsystems/GameInstanceSubsystem.h"
+#include "MissionSubsystem.generated.h"
+
+// ====== Subsystem ======
+
+UCLASS(BlueprintType)
+class INSIDETFV03_API UMissionSubsystem : public UGameInstanceSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	// Delegates
+
+	//On Mission Started
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMissionStarted, FGameplayTag, MissionID);
+	UPROPERTY(BlueprintAssignable)
+	FOnMissionStarted OnMissionStarted;
+
+	//On Mission Completed
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMissionCompleted, FGameplayTag, MissionID, bool, bSuccess);
+	UPROPERTY(BlueprintAssignable)
+	FOnMissionCompleted OnMissionCompleted;
+
+	//On Objective Started
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnObjectiveStarted, FGameplayTag, MissionID, FGameplayTag, ObjectiveID);
+	UPROPERTY(BlueprintAssignable)
+	FOnObjectiveStarted OnObjectiveStarted;
+
+	//On Objective Completed
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnObjectiveCompleted, FGameplayTag, MissionID, FGameplayTag, ObjectiveID, bool, bSuccess);
+	UPROPERTY(BlueprintAssignable)
+	FOnObjectiveCompleted OnObjectiveCompleted;
+
+	//On Event Broadcast
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMissionEventBroadcast, FGameplayTag, EventTag);
+	UPROPERTY(BlueprintAssignable)
+	FOnMissionEventBroadcast OnMissionEventBroadcast;
+
+public:
+
+    UPROPERTY()
+    TMap<FGameplayTag, UMissionData*> LoadedMissionAssets;
+
+	UPROPERTY(BlueprintReadOnly, Category="Mission|Runtime")
+	TMap<FGameplayTag, FMissionRuntimeState> ActiveMissions;
+
+	UPROPERTY(BlueprintReadOnly, Category="Mission|Runtime")
+	TMap<FGameplayTag, FMissionRuntimeState> CompletedMissions;
+
+	TMap<FGameplayTag, TSet<TWeakObjectPtr<AActor>>> TagToActors;
+	TMap<FGameplayTag, TWeakObjectPtr<AActor>> TagToSequence;
+
+public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
+	// Mission control
+	UFUNCTION(BlueprintCallable, Category="Mission")
+	void StartMission(FGameplayTag MissionID);
+
+	UFUNCTION(BlueprintCallable, Category="Mission")
+	void FinishMission(FGameplayTag MissionID, bool bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category="Mission")
+	bool IsMissionActive(FGameplayTag MissionID) const;
+
+
+	// Objective control
+	UFUNCTION(BlueprintCallable, Category="Objective")
+	void ActivateObjective(FGameplayTag MissionID, FGameplayTag ObjectiveID);
+
+	UFUNCTION(BlueprintCallable, Category="Objective")
+	void CompleteObjective(FGameplayTag MissionID, FGameplayTag ObjectiveID, bool bSuccess);
+
+	UFUNCTION(BlueprintCallable, Category="Objective")
+	bool IsObjectiveActive(FGameplayTag MissionID, FGameplayTag ObjectiveID) const;
+
+
+	// Event bus
+	UFUNCTION(BlueprintCallable, Category="Mission|Events")
+	void EmitActorEvent(AActor* SourceActor, FGameplayTag EventTag);
+
+	// Actor registry
+	UFUNCTION(BlueprintCallable, Category="Mission|Tags")
+	void RegisterActorForTag(AActor* Actor, FGameplayTag Tag);
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Tags")
+	void UnregisterActorForTag(AActor* Actor, FGameplayTag Tag);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Mission|Tags")
+	TArray<AActor*> GetActorsForTag(FGameplayTag Tag) const;
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Tags")
+	void RegisterSequenceForTag(AActor* Actor, FGameplayTag Tag);
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Tags")
+	void UnregisterSequenceForTag(AActor* Actor, FGameplayTag Tag);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Mission|Tags")
+	AActor* GetSequenceForTag(FGameplayTag Tag) const;
+
+protected:
+	//Tags
+	void PruneTag(FGameplayTag Tag);
+
+	// ---------- Data Lookup ----------
+	const UMissionData* GetMissionAsset(FGameplayTag MissionID) const;
+    const UMissionObjective* GetObjectiveFromAsset(FGameplayTag MissionID, FGameplayTag ObjectiveID) const;
+
+	// ---------- Missions ----------
+	FMissionRuntimeState* GetActiveMissionRuntime(FGameplayTag MissionID);
+	const FMissionRuntimeState* GetActiveMissionRuntime(FGameplayTag MissionID) const;
+	EProgressState GetMissionState(FGameplayTag MissionID) const;
+	FGameplayTag FindMissionByObjective(FGameplayTag ObjectiveID) const;
+
+    // Callback function for Async Mission Loading
+    void OnMissionAssetLoaded(FPrimaryAssetId LoadedId, FGameplayTag MissionID);
+
+	// ---------- Objectives ----------
+	FObjectiveRuntimeState* GetObjectiveRuntime(FGameplayTag MissionID, FGameplayTag ObjectiveID);
+	const FObjectiveRuntimeState* GetObjectiveRuntime(FGameplayTag MissionID, FGameplayTag ObjectiveID) const;
+	EProgressState GetObjectiveState(FGameplayTag MissionID, FGameplayTag ObjectiveID) const;
+
+	void ConsumeEventForObjective(FGameplayTag MissionID, const UMissionObjective* ObjDef,
+		 	FObjectiveRuntimeState& ObjRt, FGameplayTag EventTag, AActor* SourceActor);
+	void ActivateNextObjectives(FGameplayTag MissionID, const TArray<FGameplayTag>& NextObjectiveIDs);
+
+	bool IsObjectiveCompleted_All(const UMissionObjective* ObjDef, const FObjectiveRuntimeState& ObjRt) const;
+    bool IsObjectiveCompleted_Any(const UMissionObjective* ObjDef, const FObjectiveRuntimeState& ObjRt) const;
+	
+	// ---------- Steps ----------
+	void EnterOrderedObjectiveStep(FGameplayTag MissionID, FGameplayTag ObjectiveID);
+	void OnStepCompleted(FGameplayTag MissionID, FGameplayTag ObjectiveID, const FName& StepID);
+	
+	// ---------- Start/End Actions ----------
+	void RunActions(const TArray<FObjectiveActionDefinition>& Actions); //Calls RunAction for each member of Actions Array
+	void RunAction(const FObjectiveActionDefinition& Action);
+
+	void SendCommandToActor(FGameplayTag ActorTag, FName CommandName);
+	void ApplyLevelEnvironmentPhase(FName ChannelName, FName PhaseName);
+	void ShowOrHideWidget(FGameplayTag WidgetTag);
+	void PlayOrStopSequence(FGameplayTag SequenceTag);
+
+
+};

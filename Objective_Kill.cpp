@@ -1,0 +1,34 @@
+
+#include "Objective_Kill.h"
+
+
+virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
+    AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override
+{
+    // 1. Tag Check
+    if (!EventTag.MatchesTag(EnemyDeathTag)) return false;
+
+    // 2. Source Check (The reason this class exists)
+    if (bRequirePlayerSource)
+    {
+        // If the killer (SourceActor) isn't the player, ignore it.
+        // (Assuming your PlayerController or Pawn has this interface or tag)
+        if (!IsValid(SourceActor) || !SourceActor->ActorHasTag("Player")) 
+        {
+            return false; 
+        }
+    }
+
+    // 3. Increment (Same generic storage as Count)
+    FName Key("KillCount");
+    int32 CurrentKills = RuntimeState.IntStorage.FindRef(Key);
+    
+    RuntimeState.IntStorage.Add(Key, ++CurrentKills);
+    
+    return true;
+}
+
+virtual bool IsComplete(const FObjectiveRuntimeState& RuntimeState) const override
+{
+    return RuntimeState.IntStorage.FindRef("KillCount") >= RequiredKills;
+}
