@@ -1,11 +1,10 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
-#include "MissionObjective.h" 
+#include "Missions/Objectives/MissionObjective.h" 
 #include "MissionData.generated.h"
 
 /**
@@ -22,15 +21,15 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Identity")
     FGameplayTag MissionID;
 
-    UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "Objectives")
+    UPROPERTY(EditDefaultsOnly, Instanced, BlueprintReadOnly, Category = "Objectives", meta = (TitleProperty = "Name"))
     TArray<TObjectPtr<UMissionObjective>> ObjectiveArray;
 
 
     // Using TSoftObjectPtr points to the specific asset file without forcing it to load into memory immediately.
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Next Mission")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Outcome")
     TSoftObjectPtr<UMissionData> NextMissionAsset;
 
-    UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Next Mission")
+    UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Outcome")
     FGameplayTag NextMissionID;
 
     virtual FPrimaryAssetId GetPrimaryAssetId() const override;

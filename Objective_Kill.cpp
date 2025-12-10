@@ -1,9 +1,9 @@
 
-#include "Objective_Kill.h"
+#include "Missions/Objectives/Objective_Kill.h"
 
 
-virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
-    AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override
+bool UObjective_Kill::OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
+    AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const
 {
     // 1. Tag Check
     if (!EventTag.MatchesTag(EnemyDeathTag)) return false;
@@ -28,7 +28,7 @@ virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag
     return true;
 }
 
-virtual bool IsComplete(const FObjectiveRuntimeState& RuntimeState) const override
+bool UObjective_Kill::IsComplete(const FObjectiveRuntimeState& RuntimeState) const 
 {
     return RuntimeState.IntStorage.FindRef("KillCount") >= RequiredKills;
 }

@@ -45,7 +45,7 @@ struct FObjectiveRuntimeState
     FGameplayTag ObjectiveID;
 
     UPROPERTY(BlueprintReadWrite, SaveGame)
-    EProgressState ProgressState = EProgressState::NotStarted;
+    EProgressState ObjectiveState = EProgressState::NotStarted;
 
     // --- (Generic Storage) ---
     

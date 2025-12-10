@@ -1,7 +1,5 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
-
-#include "ElectricitySubsystem.h"
+#include "Subsystems/ElectricitySubsystem.h"
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
 

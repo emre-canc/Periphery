@@ -3,7 +3,8 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "GameplayTagContainer.h"
-#include "MissionStructs.h"
+#include "Missions/MissionStructs.h"
+#include "Missions/Actions/MissionAction.h"
 #include "MissionObjective.generated.h"
 
 /**
@@ -18,43 +19,55 @@ class INSIDETFV03_API UMissionObjective : public UObject
 public:
     // --- Objective Info ---
 
-    // The tag used to look up this objective in the Subsystem
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "1. Identity")
-    FGameplayTag ObjectiveID;
+    // The name that will be used in the editor.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Identity")
+    FText Name;
 
     // A brief summary of what the objective entails.
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "1. Identity")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Identity")
     FText Description;
+
+    // The tag used to look up this objective in the Subsystem.
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Identity")
+    FGameplayTag ObjectiveID;
 
 
     // ---Objective Start ---
 
-    // All objectives with this enabled will automatically start
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "2. Activation")
+    // The first value in ObjectiveArray will always automatically start.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Activation")
     bool bStartAutomatically = false;
 
-    //Send Command, Update Environment, Toggle Widget, Toggle Sequence
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "2. Activation")
-    TArray<FObjectiveActionDefinition> StartActions;
+    UPROPERTY(EditAnywhere, Instanced, Category = "Activation")
+    TArray<TObjectPtr<UMissionAction>> StartActions;
 
-    // --- Objective Steps  ---
+    // --- Objective Rules  ---
     //Implemented in child classes
  
-
     // --- Objective Completion ---
 
-    //Send Command, Update Environment, Toggle Widget, Toggle Sequence
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "4. Outcome")
-    TArray<FObjectiveActionDefinition> CompleteActions;
+    UPROPERTY(EditAnywhere, Instanced, Category = "Outcome")
+    TArray<TObjectPtr<UMissionAction>> CompleteActions;
 
     // Which objectives activate when this one is finished?
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "4. Outcome")
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Outcome")
     TArray<FGameplayTag> NextObjectiveIDs;
 
+
+
     // --- Virtual API ---
-    virtual bool IsComplete() const { return false; }     // Child classes can override this for custom code-based completion checks
+
+    virtual void InitializeRuntime(FObjectiveRuntimeState& RuntimeState) const 
+        { RuntimeState.ObjectiveState = EProgressState::InProgress; }
 
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
         AActor* SourceActor, FObjectiveRuntimeState& ObjectiveRuntime) const { return false; }
+
+    /** Called when ANY other objective in the mission is completed. */
+    virtual bool OnObjectiveCompleted(const FGameplayTag& CompletedObjectiveID,
+        FObjectiveRuntimeState& RuntimeState) const {    return false;  } 
+
+    virtual bool IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const { return false; }     // Child classes can override this for custom code-based completion checks
+
 	
 };

@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "MissionData.h"
+#include "Missions/MissionData.h"
 
 FPrimaryAssetId UMissionData::GetPrimaryAssetId() const
 {
@@ -34,6 +34,28 @@ void UMissionData::PostEditChangeProperty(FPropertyChangedEvent& PropertyChanged
         else
         {
             NextMissionID = FGameplayTag();
+        }
+    }
+    // 2. Handle Auto-Start for First Objective (New Logic)
+    // We check if the "ObjectiveArray" was touched
+    if (PropertyChangedEvent.GetPropertyName() == GET_MEMBER_NAME_CHECKED(UMissionData, ObjectiveArray) 
+        || PropertyChangedEvent.GetPropertyName() == NAME_None) // NAME_None catches some array reordering events
+    {
+        UMissionObjective* Obj;
+        for (int32 i = 0; i < ObjectiveArray.Num(); i++)
+        {
+            Obj = ObjectiveArray[i];
+            if (Obj)
+            {
+                // If it's Index 0, set true. Otherwise, set false.
+                bool bShouldAutoStart = (i == 0);
+
+                if (Obj->bStartAutomatically != bShouldAutoStart)
+                {
+                    Obj->Modify(); // Mark as dirty for saving
+                    Obj->bStartAutomatically = bShouldAutoStart;
+                }
+            }
         }
     }
 }

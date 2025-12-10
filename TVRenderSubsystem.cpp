@@ -1,55 +1,73 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+#include "Subsystems/TVRenderSubsystem.h"
+#include "Kismet/KismetRenderingLibrary.h"
 
-
-#include "TVRenderSubsystem.h"
-#include "TVRenderTargetBase.h"
-#include "Kismet/GameplayStatics.h"
-#include "Engine/World.h"
-
-
-UTVRenderSubsystem::UTVRenderSubsystem()
+UTextureRenderTarget2D* UTVRenderSubsystem::RegisterTV(AActor* TVActor, UMaterialInterface* SourceMaterial)
 {
-    static ConstructorHelpers::FClassFinder<ATVRenderTargetBase> RendererBP(TEXT("/Game/Items/TVs/BP_TVRenderTarget.BP_TVRenderTarget_C")); // Adjust this path
-    if (RendererBP.Succeeded())
+    if (!SourceMaterial || !TVActor) return nullptr;
+
+    // 1. Check if this feed already exists
+    FTVFeedData* FeedData = ActiveFeeds.Find(SourceMaterial);
+
+    if (FeedData)
     {
-        TVRenderTargetClass = RendererBP.Class;
+        // Feed exists: Just add this TV to the watchers list
+        FeedData->Watchers.Add(TVActor);
+        return FeedData->RenderTarget;
     }
-    else
-    {
-        UE_LOG(LogTemp, Error, TEXT("Failed to find BP_TargetRenderTarget class, wrong path!"));
-    }
+
+    // 2. Feed does NOT exist: Create new resources
+    UTextureRenderTarget2D* NewRT = NewObject<UTextureRenderTarget2D>(this);
+    NewRT->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+    NewRT->InitAutoFormat(640, 480);
+    NewRT->UpdateResource();
+
+    // 3. Create the data entry
+    FTVFeedData NewData;
+    NewData.RenderTarget = NewRT;
+    NewData.Watchers.Add(TVActor);
+
+    // 4. Add to Map
+    ActiveFeeds.Add(SourceMaterial, NewData);
+
+    return NewRT;
 }
 
-ATVRenderTargetBase* UTVRenderSubsystem::InitializeTVScreenRender(UMaterialInstance* RenderMaterial)
+void UTVRenderSubsystem::UnregisterTV(AActor* TVActor, UMaterialInterface* SourceMaterial)
 {
-    if (!RenderMaterial) return nullptr; 
-    UWorld* World = GetWorld();
-    if (!World) return nullptr;
+    if (!SourceMaterial || !TVActor) return;
 
-    if (ActiveTVRenderTarget.Contains(RenderMaterial))
-{
-        return ActiveTVRenderTarget[RenderMaterial];
-} else {
-    const float StartX = 10000.f;
-    const float StepX  = 1000.f;
-    FVector Location(StartX + StepX * ActiveTVRenderTarget.Num(), 0.f, 0.f);
-
-    if (!TVRenderTargetClass)
+    if (FTVFeedData* FeedData = ActiveFeeds.Find(SourceMaterial))
     {
-        UE_LOG(LogTemp, Warning, TEXT("TVRenderTargetClass is null!"));
-        return nullptr;
-    } else {
-        ATVRenderTargetBase* NewRenderer = World->SpawnActor<ATVRenderTargetBase>(
-        TVRenderTargetClass, Location, FRotator::ZeroRotator);
+        // 1. Remove this specific TV from the watchers
+        FeedData->Watchers.Remove(TVActor);
 
-        NewRenderer->RenderMesh->SetMaterial(0, RenderMaterial);
-        NewRenderer->RenderMaterial = RenderMaterial;
-        ActiveTVRenderTarget.Add(RenderMaterial, NewRenderer);
+        // 2. If NOBODY is watching anymore, clean up
+        if (FeedData->Watchers.IsEmpty())
+        {
+            // Optional: Explicitly release resource if you want to be aggressive with memory
+            // FeedData->RenderTarget->ReleaseResource(); 
      
-        return NewRenderer;
+            // Remove the entry. The Subsystem stops Ticking this material.
+            ActiveFeeds.Remove(SourceMaterial);
         }
+    }
 }
 
+void UTVRenderSubsystem::Tick(float DeltaTime)
+{
+    UWorld* World = GetWorld();
+    if (!World) return;
   
+    // Iterate over all active feeds and paint them
+    for (auto& Pair : ActiveFeeds)
+    {
+        UMaterialInterface* Mat = Pair.Key;
+        UTextureRenderTarget2D* RT = Pair.Value.RenderTarget;
     
+        // Safety check
+        if (Mat && RT)
+        {
+            UKismetRenderingLibrary::DrawMaterialToRenderTarget(World, RT, Mat);
+        }
+    }
 }

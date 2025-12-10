@@ -1,10 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Objective_Sequence.h"
+#include "Missions/Objectives/Objective_Sequence.h"
 
 
-virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
-    AActor* SourceActor, FObjectiveRuntimeState& ObjectiveRuntime) const override
+bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
+    AActor* SourceActor, FObjectiveRuntimeState& ObjectiveRuntime) const 
 {
     // 1. Get Current Step Index (Default 0)
     FName IndexKey("CurrentStepIndex");
@@ -16,7 +16,7 @@ virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag
     bool bStepProgressed = false;
 
     // 2. Check Requirements for the CURRENT step only
-    for (const FStepEventRequirement& Req : CurrentStep.RequiredEventsToCompleteStep)
+    for (const FStepRequirement& Req : CurrentStep.RequiredEventsToCompleteStep)
     {
         if (EventTag.MatchesTagExact(Req.RequiredEventTag))
         {
@@ -51,7 +51,7 @@ virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag
 
     // 3. Check if Step is Complete
     bool bStepComplete = true;
-    for (const FStepEventRequirement& Req : CurrentStep.RequiredEventsToCompleteStep)
+    for (const FStepRequirement& Req : CurrentStep.RequiredEventsToCompleteStep)
     {
         FString CountKeyStr = FString::Printf(TEXT("%s_%s_Count"), 
             *CurrentStep.StepID.ToString(), 
@@ -85,7 +85,7 @@ virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag
 }
 
 
-virtual bool IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const override
+bool UObjective_Sequence::IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const 
 {
     // Done if Index has moved past the last step
     int32 Index = ObjectiveRuntime.IntStorage.FindRef("CurrentStepIndex");
@@ -93,7 +93,7 @@ virtual bool IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const ov
 }
 
 
-void RunStepActions(const TArray<TObjectPtr<UMissionAction>>& Actions, AActor* Context) const
+void UObjective_Sequence::RunStepActions(const TArray<TObjectPtr<UMissionAction>>& Actions, AActor* Context) const
 {
     for (const auto& Action : Actions)
     {

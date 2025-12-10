@@ -1,10 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "Objective_Checklist.h"
+#include "Missions/Objectives/Objective_Checklist.h"
 
-virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
-        AActor* SourceActor, FObjectiveRuntimeState& ObjectiveRuntime) const override
+bool UObjective_Checklist::OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
+        AActor* SourceActor, FObjectiveRuntimeState& ObjectiveRuntime) const
 {
     // 1. Is this event in our required list?
     if (RequiredTags.Contains(EventTag))
@@ -22,7 +22,7 @@ virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag
     return false;
 }
 
-virtual bool IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const override
+bool UObjective_Checklist::IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const
 {
     // Check if every required tag is marked true in storage
     for (const FGameplayTag& Tag : RequiredTags)

@@ -9,19 +9,23 @@
 /**
  * 
  */
-UCLASS(DisplayName = "Count Objective")
+UCLASS(DisplayName = "Count (Do X times)")
 class INSIDETFV03_API UObjective_Count : public UMissionObjective
 {
     GENERATED_BODY()
 
 public:
-    UPROPERTY(EditAnywhere, Category = "Rules")
+    UPROPERTY(EditAnywhere, Category = "3. Rules")
     FGameplayTag TargetEvent;
 
-    UPROPERTY(EditAnywhere, Category = "Rules")
+    UPROPERTY(EditAnywhere, Category = "3. Rules")
     int32 TargetCount = 1;
 
-    UPROPERTY(EditAnywhere, Category = "Rules")
+    UPROPERTY(EditAnywhere, Category = "3. Rules")
     bool bRequireUniqueSources = false;
+
+    virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;
+    
+    virtual bool IsComplete(const FObjectiveRuntimeState& RuntimeState) const override;
 };
    

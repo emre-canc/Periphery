@@ -3,7 +3,7 @@
 
 #include "PeripheryCharMovementComponent.h"
 #include "GameFramework/Actor.h"
-#include "BaseLadder.h"
+#include "Items/BaseLadder.h"
 
 
 // Flow:    Player interacts with ladder. The ladder turns the player movement to ladder(gravity off, only moving up and down), 
