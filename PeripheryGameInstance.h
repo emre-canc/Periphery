@@ -1,27 +1,30 @@
-// #pragma once
+#pragma once
 
-// #include "CoreMinimal.h"
-// #include "Engine/GameInstance.h"
-// #include "PeripheryGameInstance.generated.h"
+#include "CoreMinimal.h"
+#include "Engine/GameInstance.h"
+#include "PeripheryGameInstance.generated.h"
 
-// class UPeripherySaveGame;
+class UPeripherySaveGame;
 
-// UCLASS()
-// class INSIDETFV03_API UPeripheryGameInstance : public UGameInstance
-// {
-//     GENERATED_BODY()
+UCLASS()
+class INSIDETFV03_API UPeripheryGameInstance : public UGameInstance
+{
+    GENERATED_BODY()
 
-// public:
+public:
 
-//     // Gathers data from all subsystems and writes to disk
-//     UFUNCTION(BlueprintCallable, Category = "SaveSystem")
-//     bool SaveGame(FString SlotName);
+    // Gathers data from all subsystems and writes to disk
+    UFUNCTION(BlueprintCallable, Category = "SaveSystem")
+    bool SaveGame(FString SlotName);
 
-//     // Reads from disk and pushes data into subsystems
-//     UFUNCTION(BlueprintCallable, Category = "SaveSystem")
-//     bool LoadGame(FString SlotName);
+    // Reads from disk and pushes data into subsystems
+    UFUNCTION(BlueprintCallable, Category = "SaveSystem")
+    bool LoadGame(FString SlotName);
 
-// protected:
-//     // Internal helper to distribute the loaded data object to subsystems
-//     void HandleSaveGameLoaded(UPeripherySaveGame* LoadedData);
-// };
+    UPROPERTY()
+    bool bLoadingSave= false;
+
+protected:
+    // Internal helper to distribute the loaded data object to subsystems
+    void HandleSaveGameLoaded(UPeripherySaveGame* LoadedData);
+};

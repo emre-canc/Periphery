@@ -18,6 +18,6 @@ void UAction_Sequence::ExecuteAction(AActor* ContextActor) const
 
     if (auto* RegistrySys = ContextActor->GetGameInstance()->GetSubsystem<UActorRegistrySubsystem>())
     {
-        RegistrySys->PlayOrStopSequence(SequenceTag);
+        RegistrySys->SendCommandToActor(SequenceTag, "PlayOrStopSequence");
     }
 }

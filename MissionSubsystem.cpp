@@ -1,7 +1,7 @@
 // MissionSubsystem.cpp
 
-#include "Missions/MissionSubsystem.h"
-#include "PeripherySaveGame.h"
+#include "Subsystems/MissionSubsystem.h"
+#include "Core/PeripherySaveGame.h"
 
 #include "Engine/AssetManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -16,7 +16,7 @@ void UMissionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Initialized"));
 
 	FString NetMode = (GetWorld()->GetNetMode() == NM_Client) ? "Client" : "Server";
-	UE_LOG(LogTemp, Error, TEXT("MissionSubsystem Init [%s]"), *NetMode);
+	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem Init [%s]"), *NetMode);
 
 }
 
@@ -331,6 +331,11 @@ void UMissionSubsystem::OnMissionAssetLoaded(FPrimaryAssetId LoadedId, FGameplay
 
 }
 
+void UMissionSubsystem::ResetSystem()
+{
+    ActiveMissions.Empty();
+    CompletedMissions.Empty();
+}
 
 // ---------- Event Bus ----------
 

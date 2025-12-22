@@ -1,132 +1,176 @@
-
 #include "Subsystems/ElectricitySubsystem.h"
+#include "Subsystems/ActorRegistrySubsystem.h"
 #include "GameFramework/Actor.h"
-#include "Engine/World.h"
 
-void UElectricitySubsystem::RegisterToFuseBox(AActor* Actor)
+void UElectricitySubsystem::SetCircuitState(FGameplayTag CircuitTag, bool bPowerOn)
 {
-    if (!IsValid(Actor))
+    if (!CircuitTag.IsValid()) return;
+
+    // --- 1. HIERARCHY CHECK (The Senior Logic) ---
+    // If we are trying to turn ON a sub-grid, ensure the Parent Grid is ON.
+    if (bPowerOn)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ElectricitySubsystem: RegisterToFuseBox: Invalid actor"));
-        return;
-    }
-
-    SystemActors.AddUnique(TWeakObjectPtr<AActor>(Actor));
-    FuseBoxActors.AddUnique(TWeakObjectPtr<AActor>(Actor));
-    UE_LOG(LogTemp, Log, TEXT("ElectricitySubsystem: RegisterToFuseBox and SystemActors: %s (count=%d)"),
-        *Actor->GetName(), FuseBoxActors.Num());
-}
-
-void UElectricitySubsystem::RegisterToSystem(AActor* Actor)
-{
-    if (!IsValid(Actor))
-    {
-        UE_LOG(LogTemp, Warning, TEXT("ElectricitySubsystem: RegisterToSystem: Invalid actor"));
-        return;
-    }
-
-    SystemActors.AddUnique(TWeakObjectPtr<AActor>(Actor));
-    UE_LOG(LogTemp, Log, TEXT("ElectricitySubsystem: RegisterToSystem: %s (count=%d)"),
-        *Actor->GetName(), SystemActors.Num());
-}
-
-void UElectricitySubsystem::OnRegisteredActorEndPlay(AActor* Actor, EEndPlayReason::Type /*Reason*/)
-{
-    const int32 RemovedFuse = FuseBoxActors.RemoveAll([Actor](const TWeakObjectPtr<AActor>& ActorPtr) { return ActorPtr.Get() == Actor; });
-    const int32 RemovedSys  = SystemActors.RemoveAll([Actor](const TWeakObjectPtr<AActor>& ActorPtr) { return ActorPtr.Get() == Actor; });
-
-    if (RemovedFuse || RemovedSys)
-    {
-        UE_LOG(LogTemp, Log, TEXT("ElectricitySubsystem: ElectricitySubsystem: %s removed (Fuse=%d, System=%d)"),
-            *Actor->GetName(), RemovedFuse, RemovedSys);
-    }
-}
-
-
-    void UElectricitySubsystem::RegisterToLocalSystem(AActor* Actor, FGameplayTag Tag)
-    {
-        if (!IsValid(Actor) || !Tag.IsValid()) return;
-
-        TSet<TWeakObjectPtr<AActor>>& SetRef = TagToActors.FindOrAdd(Tag);
-        const int32 Before = SetRef.Num();
-        SetRef.Add(Actor);
-    }
-
-
-	TArray<AActor*> UElectricitySubsystem::GetLocalSystemByTag(FGameplayTag Tag)
-    {
-            TArray<AActor*> Out;
-
-    if (!Tag.IsValid()) return Out;
-
-    auto Collect = [&](const FGameplayTag& Key)
-    {
-        if (const TSet<TWeakObjectPtr<AActor>>* SetPtr = TagToActors.Find(Key))
+        FGameplayTag ParentGrid = CircuitTag.RequestDirectParent();
+        
+        // If there is a parent, and that parent is currently OFF
+        if (ParentGrid.IsValid() && !IsCircuitOn(ParentGrid))
         {
-            for (const TWeakObjectPtr<AActor>& Weak : *SetPtr)
+            UE_LOG(LogTemp, Warning, TEXT("Electricity: Cannot turn ON '%s' because parent grid '%s' is OFF."), 
+                *CircuitTag.ToString(), *ParentGrid.ToString());
+            return; // Abort
+        }
+    }
+
+    // --- 2. UPDATE STATE ---
+    CircuitStates.Add(CircuitTag, bPowerOn);
+
+    const UGameInstance* GI = GetWorld()->GetGameInstance();
+    if (!GI) return;
+    auto* Registry = GI->GetSubsystem<UActorRegistrySubsystem>();
+    if (!Registry) return;
+
+
+    // Find intersection: "Actors that are Consumers" AND "Actors on this Circuit"
+    TArray<AActor*> CircuitItems = Registry->GetActorsWithIntersection(
+        FGameplayTag::RequestGameplayTag("Electricity.Consumer"),
+        CircuitTag
+    );
+
+    // --- 4. NOTIFY ACTORS ---
+    for (AActor* Item : CircuitItems)
+    {
+        if (Item && Item->Implements<UElectricityInterface>())
+        {
+            if (bPowerOn)
             {
-                if (AActor* A = Weak.Get())
-                {
-                    Out.Add(A);
-                }
+                IElectricityInterface::Execute_PowerOn(Item);
+            }
+            else
+            {
+                IElectricityInterface::Execute_PowerOff(Item);
             }
         }
-    };
-
-    Collect(Tag);
-
-    // Optionally prune duplicates (unlikely) and nulls
- 
-    return Out;
-}
-
-void UElectricitySubsystem::UnregisterFromAll(AActor* Actor)
-{
-    if (!IsValid(Actor)) return;
-
-    FuseBoxActors.RemoveAll([Actor](const TWeakObjectPtr<AActor>& ActorPtr){ return ActorPtr.Get() == Actor; });
-    SystemActors.RemoveAll([Actor](const TWeakObjectPtr<AActor>& ActorPtr){ return ActorPtr.Get() == Actor; });
-
-    for (auto& Pair : TagToActors)
-    {
-        Pair.Value.Remove(TWeakObjectPtr<AActor>(Actor));
     }
-
-    UE_LOG(LogTemp, Log, TEXT("ElectricitySubsystem: Unregistered %s from all systems"), *Actor->GetName());
+    
+    UE_LOG(LogTemp, Log, TEXT("Electricity: Circuit '%s' set to %s. Affected %d actors."), 
+        *CircuitTag.ToString(), bPowerOn ? TEXT("ON") : TEXT("OFF"), CircuitItems.Num());
 }
 
-
- void UElectricitySubsystem::GetFuseBoxActors(TArray<AActor*>& FuseBoxArray) const
+bool UElectricitySubsystem::IsCircuitOn(FGameplayTag CircuitTag) const
 {
-    FuseBoxArray.Reset();
-    for (const TWeakObjectPtr<AActor>& Weak : FuseBoxActors)
+    // Check local map. Default to TRUE if not found (Grid starts active).
+    if (const bool* bState = CircuitStates.Find(CircuitTag))
     {
-        if (AActor* A = Weak.Get())
+        return *bState;
+    }
+    return true; 
+}
+
+// ---------- QUERIES ----------
+
+TArray<AActor*> UElectricitySubsystem::GetGridActors() const
+{
+    if (const UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        if (auto* Registry = GI->GetSubsystem<UActorRegistrySubsystem>())
         {
-            FuseBoxArray.Add(A);
+            return Registry->GetActors(FGameplayTag::RequestGameplayTag("Electricity"));
         }
     }
+    return TArray<AActor*>();
 }
 
-
- void UElectricitySubsystem::GetSystemActors(TArray<AActor*>& SystemArray) const
- {
-        SystemArray.Reset();
-    for (const TWeakObjectPtr<AActor>& Weak : SystemActors)
+TArray<AActor*> UElectricitySubsystem::GetFuseBoxActors() const
+{
+    if (const UGameInstance* GI = GetWorld()->GetGameInstance())
     {
-        if (AActor* A = Weak.Get())
+        if (auto* Registry = GI->GetSubsystem<UActorRegistrySubsystem>())
         {
-            SystemArray.Add(A);
+        return Registry->GetActors(FGameplayTag::RequestGameplayTag("Electricity.Source.Fusebox"));
         }
     }
- }
-
-
-
-bool UElectricitySubsystem::GetStorePowerState() {return StorePowerState;}
-
-
-void UElectricitySubsystem::SetStorePowerState(bool PowerState) 
-{
-    StorePowerState = PowerState;
+    return TArray<AActor*>();
 }
+
+TArray<AActor*> UElectricitySubsystem::GetLightActors() const
+{
+    if (const UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        if (auto* Registry = GI->GetSubsystem<UActorRegistrySubsystem>())
+        {
+            return Registry->GetActors(FGameplayTag::RequestGameplayTag("Electricity.Consumer.Light"));
+        }
+    }
+    return TArray<AActor*>();
+}
+
+TArray<AActor*> UElectricitySubsystem::GetLightsInRoom(FGameplayTag RoomTag) const
+{
+    if (const UGameInstance* GI = GetWorld()->GetGameInstance())
+    {
+        if (auto* Registry = GI->GetSubsystem<UActorRegistrySubsystem>())
+        {
+            return Registry->GetActorsWithIntersection(
+                FGameplayTag::RequestGameplayTag("Electricity.Consumer.Light"),
+                RoomTag
+            );
+        }
+    }
+    return TArray<AActor*>();
+}
+
+// ---------- SAVE / LOAD ----------
+
+void UElectricitySubsystem::RestoreCircuitStates(const TMap<FGameplayTag, bool>& LoadedStates)
+{
+    CircuitStates = LoadedStates;
+    
+    // Re-apply states to the world to ensure visuals match data
+    for (const auto& Pair : CircuitStates)
+    {
+        SetCircuitState(Pair.Key, Pair.Value);
+    }
+}
+
+// ---------- DEBUG ----------
+
+void UElectricitySubsystem::SetCircuitDebug(FName CircuitTagName, bool bOn)
+{
+    FGameplayTag Tag = FGameplayTag::RequestGameplayTag(CircuitTagName);
+    if (Tag.IsValid())
+    {
+        SetCircuitState(Tag, bOn);
+    }
+}
+
+void UElectricitySubsystem::KillAllPower()
+{
+    // Hard shutdown of known main grids
+    SetCircuitState(FGameplayTag::RequestGameplayTag("Electricity.Grid.MainStore"), false);
+    SetCircuitState(FGameplayTag::RequestGameplayTag("Electricity.Grid.Street"), false);
+    UE_LOG(LogTemp, Warning, TEXT("CMD: All Power KILLED"));
+}
+
+void UElectricitySubsystem::RestoreAllPower()
+{
+    // Hard shutdown of known main grids
+    SetCircuitState(FGameplayTag::RequestGameplayTag("Electricity.Grid.MainStore"), true);
+    SetCircuitState(FGameplayTag::RequestGameplayTag("Electricity.Grid.Street"), true);
+    UE_LOG(LogTemp, Warning, TEXT("CMD: All Power RESTORED"));
+}
+
+// public:
+//     // Getter for the Save System to read data
+//     const TMap<FGameplayTag, bool>& GetCircuitStates() const { return CircuitStates; }
+
+//     // Setter for the Save System to restore data
+//     void RestoreCircuitStates(const TMap<FGameplayTag, bool>& LoadedStates)
+//     {
+//         CircuitStates = LoadedStates;
+        
+//         // CRITICAL: Re-apply the states to the world immediately!
+//         for (const auto& Pair : CircuitStates)
+//         {
+//             SetCircuitState(Pair.Key, Pair.Value);
+//         }
+//     }

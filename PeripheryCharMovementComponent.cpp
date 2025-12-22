@@ -1,7 +1,6 @@
-// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "PeripheryCharMovementComponent.h"
+#include "Player/PeripheryCharMovementComponent.h"
 #include "GameFramework/Actor.h"
 #include "Items/BaseLadder.h"
 

@@ -5,39 +5,30 @@
 #include "GameplayTagContainer.h"
 #include "WidgetStructs.generated.h"
 
-
+// 1. VISUAL LAYER (Where does it draw?)
 UENUM(BlueprintType)
-enum class EWidgetType : uint8
+enum class EWidgetLayer : uint8
 {
-    HUD        UMETA(DisplayName="HUD"),        // (The persistent layer)
-    Menu       UMETA(DisplayName="Menu"),       //  (Pause screens, Inventory)
-    Interactive UMETA(DisplayName="Interactive"), // Minigames, Keypads
-    Passive    UMETA(DisplayName="Passive")     // Notifications, Subtitles
+    Game        UMETA(DisplayName="Game (HUD)"),       // Z-Order 10
+    Menu        UMETA(DisplayName="Menu (Settings)"),  // Z-Order 50
+    Modal       UMETA(DisplayName="Modal (Popup)"),    // Z-Order 100
+    System      UMETA(DisplayName="System (Toast)")    // Z-Order 200
 };
 
-
+// 2. INPUT MODE (Who gets the buttons?)
 UENUM(BlueprintType)
-enum class EWidgetMode : uint8
+enum class EWidgetInputMode : uint8
 {
-    Modal     UMETA(DisplayName="Modal"),
-    Overlay   UMETA(DisplayName="Overlay"),
-    Menu      UMETA(DisplayName="Menu")
-};
+    // Input goes to Player Controller. UI is ignored.
+    GameOnly        UMETA(DisplayName="Game Only"),
 
-UENUM(BlueprintType)
-enum class EWidgetProgression : uint8
-{
-    Manual     UMETA(DisplayName="Manual"),
-    Automatic  UMETA(DisplayName="Automatic")
-};
+    // Input goes to UI, Player Controller is ignored.
+    UIOnly          UMETA(DisplayName="UI Only"),
+    
 
-UENUM(BlueprintType)
-enum class EWidgetPriority : uint8
-{
-    Low     UMETA(DisplayName="Low"),
-    Medium  UMETA(DisplayName="Medium"),
-    High    UMETA(DisplayName="High"),
-    Urgent  UMETA(DisplayName="Urgent")
+    // If the UI ignores input, it falls through to the Player Controller.
+    GameAndUI       UMETA(DisplayName="Game and UI")
+    
 };
 
 USTRUCT(BlueprintType)
@@ -48,26 +39,26 @@ struct FWidgetData
     UPROPERTY(Transient, BlueprintReadOnly) 
     TWeakObjectPtr<UUserWidget> Widget;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere) 
-    EWidgetType Type = EWidgetType::Passive;
+    // --- VISUALS ---
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Config") 
+    EWidgetLayer Layer = EWidgetLayer::Game;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere) 
-    EWidgetMode Mode = EWidgetMode::Overlay;
+    // --- BEHAVIOR ---
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Config") 
+    EWidgetInputMode InputMode = EWidgetInputMode::UIOnly;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere) 
-    EWidgetProgression Progression = EWidgetProgression::Automatic;
+    // Do we see the mouse? (SEPARATE from Input Mode)
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Config") 
+    bool bShowMouseCursor = false;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere) 
-    EWidgetPriority Priority = EWidgetPriority::Low;
+    // Do we freeze the world?
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Config") 
+    bool bPauseGame = false;
 
-    UPROPERTY(BlueprintReadWrite, EditAnywhere) 
+    // Tag for finding this widget later
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Config") 
     FName ContextTag = NAME_None;
 
-
-    //Constructers used for C++, commented because it is not needed but good to have.
-    // FWidgetData() {} 
-    // FWidgetData(UUserWidget* InWidget, EWidgetType InType)
-    //     : Widget(InWidget), Type(InType) {}
 };
 
 

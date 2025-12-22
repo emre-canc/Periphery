@@ -1,9 +1,8 @@
-
 #pragma once
 #include "CoreMinimal.h"
 #include "Missions/Actions/MissionAction.h"
 #include "Widget/WidgetConfig.h"
-#include "Blueprint/UserWidget.h"
+#include "Widget/WidgetStructs.h"
 #include "Action_CreateWidget.generated.h"
 
 UCLASS(DisplayName = "Create Widget")
@@ -12,14 +11,27 @@ class INSIDETFV03_API UAction_CreateWidget : public UMissionAction
     GENERATED_BODY()
 
 public:
-    // This is the magic dropdown!
-    // Selecting a different Payload class here changes the variables below it.
+    // The Data Asset (Content: Text, Images, etc.)
     UPROPERTY(EditAnywhere, Instanced, Category = "Config")
-    TObjectPtr<UWidgetConfig> WidgetData;
+    TObjectPtr<UWidgetConfig> WidgetConfig;
 
-    UPROPERTY(EditAnywhere, Category = "Config")
-    bool bAddToViewport = true;
+    // --- WINDOW RULES (Context: How does it behave?) ---
 
-    // Declaration
+    UPROPERTY(EditAnywhere, Category = "Data")
+    EWidgetLayer Layer = EWidgetLayer::Menu;
+
+    UPROPERTY(EditAnywhere, Category = "Data")
+    EWidgetInputMode InputMode = EWidgetInputMode::UIOnly;
+
+    UPROPERTY(EditAnywhere, Category = "Data")
+    bool bShowMouseCursor = true;
+
+    UPROPERTY(EditAnywhere, Category = "Data")
+    bool bPauseGame = false;
+    
+    // Useful for finding/closing this specific widget later
+    UPROPERTY(EditAnywhere, Category = "Data")
+    FName ContextTag = NAME_None;
+
     virtual void ExecuteAction(AActor* ContextActor) const override;
 };

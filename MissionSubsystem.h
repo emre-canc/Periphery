@@ -2,10 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
-#include "MissionStructs.h"
-#include "MissionData.h"
-
-
+#include "Missions/MissionStructs.h"
+#include "Missions/MissionData.h"
 #include "GameFramework/Actor.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "MissionSubsystem.generated.h"
@@ -93,6 +91,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "SaveSystem")
 	void LoadFromGame(const UPeripherySaveGame* SaveObject);
+
+	UFUNCTION(BlueprintCallable)
+	void ResetSystem();
 
 protected:
 

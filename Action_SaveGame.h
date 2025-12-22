@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -7,11 +5,17 @@
 #include "Action_SaveGame.generated.h"
 
 /**
- * 
+ * Triggers a full game save via the Game Instance.
  */
-UCLASS()
+UCLASS(DisplayName = "Save Game")
 class INSIDETFV03_API UAction_SaveGame : public UMissionAction
 {
-	GENERATED_BODY()
-	
+    GENERATED_BODY()
+
+public:
+    // Default to "AutoSave" so you don't have to type it every time
+    UPROPERTY(EditAnywhere, Category = "Config")
+    FString SlotName = "AutoSave"; 
+
+    virtual void ExecuteAction(AActor* ContextActor) const override;
 };

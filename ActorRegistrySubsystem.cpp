@@ -1,8 +1,5 @@
-
 #include "Subsystems/ActorRegistrySubsystem.h"
-
-#include "LevelSequenceActor.h"
-#include "LevelSequencePlayer.h"
+#include "Interfaces/ActorRegistryInterface.h"
 #include "Misc/OutputDeviceNull.h"
 
 
@@ -63,64 +60,112 @@ void UActorRegistrySubsystem::UnregisterActorForTag(AActor* Actor, FGameplayTag 
 	}
 }
 
-void UActorRegistrySubsystem::RegisterSequenceForTag(AActor* Actor, FGameplayTag Tag)
+void UActorRegistrySubsystem::RemoveActorFromAllTags(AActor* Actor)
 {
-	if (!IsValid(Actor) || !Tag.IsValid()) return;
+    if (!Actor) return;
 
-	TWeakObjectPtr<AActor> WeakActor = Actor;
-	TagToSequence.Add(Tag, WeakActor);
-
-	UE_LOG(LogTemp, Log, TEXT("ActorRegistrySubsystem: Registered Sequence '%s' under Tag '%s'"),
-		*GetNameSafe(Actor), *Tag.ToString());
+    // Iterate over the entire map (Values are Sets of Actors)
+    for (auto It = TagToActors.CreateIterator(); It; ++It)
+    {
+        TSet<TWeakObjectPtr<AActor>>& ActorSet = It.Value();
+        
+        // Remove the actor if present
+        if (ActorSet.Remove(Actor) > 0)
+        {
+            // If the set becomes empty, we can remove the Tag entry entirely
+            if (ActorSet.IsEmpty())
+            {
+                It.RemoveCurrent();
+            }
+        }
+    }
 }
 
-void UActorRegistrySubsystem::UnregisterSequenceForTag(AActor* Actor, FGameplayTag Tag)
+// ---------- Queries ----------
+TArray<AActor*> UActorRegistrySubsystem::GetActorsForTag(FGameplayTag Tag) const 
 {
-	if (!IsValid(Actor) || !Tag.IsValid()) return;
+    TArray<AActor*> Results;
 
-	if (TWeakObjectPtr<AActor>* FoundActor = TagToSequence.Find(Tag))
-	{
-		if (FoundActor->Get() == Actor)
-		{
-			TagToSequence.Remove(Tag);
-			UE_LOG(LogTemp, Log, TEXT("ActorRegistrySubsystem: Unregistered Sequence '%s' under Tag '%s'"),
-				*GetNameSafe(Actor), *Tag.ToString());
-		}
-	}
+    if (const TSet<TWeakObjectPtr<AActor>>* FoundSet = TagToActors.Find(Tag))
+    {
+        for (const TWeakObjectPtr<AActor>& WeakActor : *FoundSet)
+        {
+            if (AActor* LiveActor = WeakActor.Get())
+            {
+                Results.Add(LiveActor);
+            }
+        }
+    }
+    return Results;
 }
 
-TArray<AActor*> UActorRegistrySubsystem::GetActorsForTag(FGameplayTag Tag) const
+TArray<AActor*> UActorRegistrySubsystem::GetActorsWithIntersection(FGameplayTag TagA, FGameplayTag TagB)
 {
-	TArray<AActor*> Out;
-	if (!Tag.IsValid()) return Out;
+    // 1. Get Set A (using hierarchy search)
+    TArray<AActor*> ListA = GetActors(TagA);
+    if (ListA.IsEmpty()) return TArray<AActor*>();
 
-	if (const TSet<TWeakObjectPtr<AActor>>* SetPtr = TagToActors.Find(Tag))
-	{
-		for (const TWeakObjectPtr<AActor>& ObjPtr : *SetPtr)
-		{
-			if (AActor* A = ObjPtr.Get())
-			{
-				Out.Add(A);
-			}
-		}
-	}
-	return Out;
+    // 2. Get Set B (using hierarchy search)
+    TArray<AActor*> ListB = GetActors(TagB);
+    if (ListB.IsEmpty()) return TArray<AActor*>();
+
+    // 3. Convert List B to Set for O(1) lookup speed
+    TSet<AActor*> SetB(ListB);
+
+    // 4. Filter A
+    TArray<AActor*> Intersection;
+    for (AActor* Actor : ListA)
+    {
+        if (SetB.Contains(Actor))
+        {
+            Intersection.Add(Actor);
+        }
+    }
+
+    return Intersection;
 }
 
-AActor* UActorRegistrySubsystem::GetSequenceForTag(FGameplayTag Tag) const
+TArray<AActor*> UActorRegistrySubsystem::GetActors(FGameplayTag Tag) const
 {
-	AActor* ActorOutput = nullptr;
-	if (!Tag.IsValid()) return ActorOutput;
+    TArray<AActor*> Results;
+    if (!Tag.IsValid()) return Results;
 
-	if (const TWeakObjectPtr<AActor>* Found = TagToSequence.Find(Tag))
-	{
-		ActorOutput = Found->Get(); // get the actual actor
-	}
+    // Iterate over ALL registered tags to find children
+    for (const auto& Pair : TagToActors)
+    {
+        const FGameplayTag& RegisteredTag = Pair.Key;
 
-	return ActorOutput;
+        // MatchesTag returns true for Exact Matches AND Child Matches
+        if (RegisteredTag.MatchesTag(Tag))
+        {
+            const TSet<TWeakObjectPtr<AActor>>& ActorSet = Pair.Value;
+            
+            for (const TWeakObjectPtr<AActor>& WeakActor : ActorSet)
+            {
+                if (AActor* LiveActor = WeakActor.Get())
+                {
+                    Results.AddUnique(LiveActor);
+                }
+            }
+        }
+    }
+    return Results;
 }
 
-
+AActor* UActorRegistrySubsystem::FindActor(FGameplayTag Tag) const
+{
+    if (const TSet<TWeakObjectPtr<AActor>>* FoundSet = TagToActors.Find(Tag))
+    {
+        for (const TWeakObjectPtr<AActor>& WeakActor : *FoundSet)
+        {
+            if (AActor* LiveActor = WeakActor.Get())
+            {
+                return LiveActor; // Return the first valid one immediately
+            }
+        }
+    }
+    return nullptr;
+}
 
 // ---------- Helper ----------
 void UActorRegistrySubsystem::PruneTag(FGameplayTag Tag)
@@ -143,7 +188,6 @@ void UActorRegistrySubsystem::PruneTag(FGameplayTag Tag)
 }
 
 // ---------- Save System ----------
-
 void UActorRegistrySubsystem::RegisterSaveableActor(AActor* Actor, FGuid ActorGuid)
 {
     if (!Actor || !ActorGuid.IsValid())
@@ -187,92 +231,30 @@ TArray<AActor*> UActorRegistrySubsystem::GetAllSaveableActors() const
     return ValidActors;
 }
 
-
-
 // ---------- Actions ----------
-
-
 void UActorRegistrySubsystem::SendCommandToActor(FGameplayTag ActorTag, FName CommandName)
 {
-
-	if (!ActorTag.IsValid() || CommandName.IsNone()) 
-	{
-		UE_LOG(LogTemp, Warning, TEXT("ActorRegistrySubsystem: SendCommand ERROR"));
-		return;
-	}
-
-	TArray<AActor*> Actors = GetActorsForTag(ActorTag);
-	for (AActor* A : Actors)
-	{
-		if (!IsValid(A)) 
-		{
-			UE_LOG(LogTemp, Warning, TEXT("ActorRegistrySubsystem: HandleCommand cannot find actors with ActorTag"));
-			continue;
-		}
-
-		// Expect a function named "HandleCommand" taking an FName or similar.
-		if (UFunction* Fn = A->FindFunction(TEXT("HandleCommand")))
-		{
-			struct { FName Command; } Params{ CommandName };
-			A->ProcessEvent(Fn, &Params);
-			continue;
-		}
-
-		// Fallback: Call by name with string arg (optional)
-		UE_LOG(LogTemp, Log, TEXT("ActorRegistrySubsystem: Fallback, looking for HandleCommand by name"));
-		FOutputDeviceNull Ar;
-		const FString ArgStr = CommandName.ToString();
-		A->CallFunctionByNameWithArguments(*FString::Printf(TEXT("HandleCommand %s"), *ArgStr), Ar, nullptr, true);
-	}
-}
-
-
-
-
-
-
-void UActorRegistrySubsystem::PlayOrStopSequence(FGameplayTag SequenceTag)
-{
-    if (!SequenceTag.IsValid())
+    if (!ActorTag.IsValid() || CommandName.IsNone()) 
     {
-        UE_LOG(LogTemp, Warning, TEXT("ActorRegistrySubsystem: PlayOrStopSequence skipped — invalid SequenceTag"));
+        UE_LOG(LogTemp, Warning, TEXT("ActorRegistrySubsystem: SendCommand ERROR - Invalid Tag or Command"));
         return;
     }
 
-	if (!GetWorld() || GetWorld()->bIsTearingDown) return;
+    TArray<AActor*> Actors = GetActors(ActorTag);
 
-    ALevelSequenceActor* SeqActor = nullptr;
-
-    if (TWeakObjectPtr<AActor>* Found = TagToSequence.Find(SequenceTag))
+    for (AActor* A : Actors)
     {
-        SeqActor = Cast<ALevelSequenceActor>(Found->Get());
-    }
-
-    if (!IsValid(SeqActor))
-    {
-        UE_LOG(LogTemp, Warning, TEXT("ActorRegistrySubsystem: PlayOrStopSequence — no LevelSequenceActor registered for tag '%s'"),
-            *SequenceTag.ToString());
-        return;
-    }
-
-    if (ULevelSequencePlayer* SeqPlayer = SeqActor->GetSequencePlayer())
-    {
-		if (SeqPlayer->IsPlaying()) 
-		{
-			SeqPlayer->Stop();
-			UE_LOG(LogTemp, Log, TEXT("ActorRegistrySubsystem: PlayOrStopSequence — stopped '%s' (Tag: %s)"),
-				*GetNameSafe(SeqActor), *SequenceTag.ToString());
-		} else 
-		{
-			SeqPlayer->Play();
-			UE_LOG(LogTemp, Log, TEXT("ActorRegistrySubsystem: PlayOrStopSequence — played '%s' (Tag: %s)"),
-				*GetNameSafe(SeqActor), *SequenceTag.ToString());
-		}
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("ActorRegistrySubsystem: PlayOrStopSequence — SequencePlayer missing on '%s' (Tag: %s)"),
-            *GetNameSafe(SeqActor), *SequenceTag.ToString());
+        // 1. Check for Interface Implementation
+        if (A && A->Implements<UActorRegistryInterface>())
+        {
+            // 2. Execute the Interface call safely
+            IActorRegistryInterface::Execute_HandleCommand(A, CommandName);
+        }
+        else if (A)
+        {
+            UE_LOG(LogTemp, Verbose, TEXT("ActorRegistrySubsystem: Actor %s found for tag %s but does not implement ActorRegistryInterface."), *A->GetName(), *ActorTag.ToString());
+        }
     }
 }
 
+// void UActorRegistrySubsystem::PlayOrStopSequence(FGameplayTag SequenceTag) // use Commands "PlaySequence" instead

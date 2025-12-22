@@ -1,71 +1,72 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "GameplayTagContainer.h" 
+#include "GameplayTagContainer.h"
+#include "Interfaces/ElectricityInterface.h"
 #include "ElectricitySubsystem.generated.h"
-
-/**
- * 
- */
-class AActor;
 
 
 UCLASS()
 class INSIDETFV03_API UElectricitySubsystem : public UWorldSubsystem
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
-	private:
+public:
 
-    UFUNCTION()
-    void OnRegisteredActorEndPlay(AActor* Actor, EEndPlayReason::Type EndPlayReason);
-	
+    // ---------- CONTROL ----------
 
-	public:
-	
-	UFUNCTION(BlueprintCallable, Category="Electricity")
-    void RegisterToFuseBox(AActor* Actor);
+    /** * Turns a specific circuit ON or OFF.
+     * Updates internal state and notifies all actors on that circuit.
+     * Checks hierarchy: You cannot turn a Child Grid ON if the Parent Grid is OFF.
+     */
+    UFUNCTION(BlueprintCallable, Category="Electricity")
+    void SetCircuitState(FGameplayTag CircuitTag, bool bPowerOn);
 
-	UFUNCTION(BlueprintCallable, Category="Electricity")
-    void RegisterToSystem(AActor* Actor);
+    // ---------- QUERIES ----------
 
-	UFUNCTION(BlueprintCallable, Category="Electricity|Local")
-	void RegisterToLocalSystem(AActor* Actor, FGameplayTag Tag);
+    UFUNCTION(BlueprintPure, Category="Electricity")
+    bool IsCircuitOn(FGameplayTag CircuitTag) const;
+    
+    // Returns EVERYTHING connected to the grid (Sources, Lights, Switches)
+    UFUNCTION(BlueprintPure, Category="Electricity")
+    TArray<AActor*> GetGridActors() const;
 
-	UFUNCTION(BlueprintCallable, Category="Electricity|Local")
-	TArray<AActor*> GetLocalSystemByTag(FGameplayTag Tag);
+    // Returns only the Power Sources
+    UFUNCTION(BlueprintPure, Category="Electricity")
+    TArray<AActor*> GetFuseBoxActors() const;
 
-	UFUNCTION(BlueprintCallable, Category="Electricity")
-    void SetStorePowerState(bool PowerState);
+    // Returns only the Lights (Convenience function)
+    UFUNCTION(BlueprintPure, Category="Electricity")
+    TArray<AActor*> GetLightActors() const;
 
-	UFUNCTION(BlueprintPure, Category="Electricity")
-    bool GetStorePowerState();
+    // Returns Lights specifically in a target room (e.g., "Location.Store.Basement")
+    UFUNCTION(BlueprintPure, Category="Electricity")
+    TArray<AActor*> GetLightsInRoom(FGameplayTag RoomTag) const;
 
-	UFUNCTION(BlueprintCallable, Category="Electricity")
-    void UnregisterFromAll(AActor* Actor);
+    // ---------- SAVE / LOAD ----------
 
-	UFUNCTION(BlueprintPure)
-	void GetFuseBoxActors(TArray<AActor*>& FuseBoxArray) const; // return filtered strong refs
+    // Call this when saving the game
+    const TMap<FGameplayTag, bool>& GetCircuitStates() const { return CircuitStates; }
 
-	UFUNCTION(BlueprintPure)
-	void GetSystemActors(TArray<AActor*>& SystemArray) const;
+    // Call this when loading the game
+    void RestoreCircuitStates(const TMap<FGameplayTag, bool>& LoadedStates);
 
-	UPROPERTY(Transient)
-	TArray<TWeakObjectPtr<AActor>> FuseBoxActors;
+    // ---------- DEBUG CONSOLE COMMANDS ----------
 
-	UPROPERTY(Transient)
-	TArray<TWeakObjectPtr<AActor>> SystemActors;
+    UFUNCTION(Exec) 
+    void SetCircuitDebug(FName CircuitTagName, bool bOn);
 
+    UFUNCTION(Exec)
+    void KillAllPower();
 
+    UFUNCTION(Exec)
+    void RestoreAllPower();
 
-	private:
+private:
 
-    TMap<FGameplayTag, TSet<TWeakObjectPtr<AActor>>> TagToActors;
-
-	bool StorePowerState = true;
-
-
+    // Tracks the current state of every grid. If a tag is missing, we assume it is ON.
+    UPROPERTY()
+    TMap<FGameplayTag, bool> CircuitStates;
+    
 };

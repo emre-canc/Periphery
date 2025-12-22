@@ -4,6 +4,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Blueprint/UserWidget.h"
 #include "Widget/WidgetStructs.h"
+#include "Interfaces/WidgetInterface.h"
 #include "WidgetSubsystem.generated.h"
 
 UCLASS()
@@ -17,8 +18,8 @@ public:
 
     // Registers a widget, calculates Z-Order, pushes to Stack, and hides HUD automatically.
     UFUNCTION(BlueprintCallable, Category="WidgetSubsystem")
-    void RegisterWidget(UUserWidget* Widget, EWidgetType Type, EWidgetMode Mode, 
-         EWidgetProgression Progression, EWidgetPriority Priority, FName ContextTag = NAME_None);
+    void RegisterWidget(UUserWidget* Widget, EWidgetLayer Layer, EWidgetInputMode InputMode,
+        bool bShowMouseCursor, bool bPauseGame, FName ContextTag = NAME_None);
 
     // Removes widget. If it was a Menu, pops from Stack and checks if HUD should reappear.
     UFUNCTION(BlueprintCallable, Category="WidgetSubsystem")
@@ -49,6 +50,23 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category="WidgetSubsystem")
     bool GetTopWidget(UUserWidget*& Widget);
 
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="WidgetSubsystem")
+    bool CloseWidgetByContext(FName ContextTag);
+
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category="WidgetSubsystem")
+    UUserWidget* FindWidgetByTag(FName Tag) const;
+
+    UFUNCTION(BlueprintCallable, Category="WidgetSubsystem")
+    void SetHUDVisibility(bool bVisible);
+
+    UFUNCTION(BlueprintCallable, Category = "WidgetSubsystem|Menus")
+    void OpenMenu(TSubclassOf<UUserWidget> WidgetClass);
+
+    UFUNCTION(BlueprintCallable, Category = "WidgetSubsystem|Menus")
+    void CloseMenu();
+
+
+
     // --- EVENTS ---
 
     DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWidgetEvent, FWidgetData, WidgetData);
@@ -58,9 +76,6 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="WidgetSubsystem")
     FOnWidgetEvent OnWidgetUnregistered;
-    
-    UPROPERTY(BlueprintReadWrite, Category="WidgetSubsystem")
-    UUserWidget* HUDWidget; 
 
 private:
     
@@ -71,6 +86,11 @@ private:
     UPROPERTY()
     TArray<TWeakObjectPtr<UUserWidget>> MenuStack;
 
+    UPROPERTY()
+    TObjectPtr<UUserWidget> CurrentMenuWidget;
+
     // Internal helper to sync Input Mode/HUD visibility with the Stack state
     void RefreshState(); 
+
+    
 };

@@ -1,74 +1,75 @@
-#include "Widget/WidgetSubsystem.h"
+#include "Subsystems/WidgetSubsystem.h"
+#include "Widget/PeripheryWidgetSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerController.h"
 #include "Blueprint/UserWidget.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
 
-// Hard-coded Z-Orders to prevent "Diversion Squeezing" (Overlaps)
-namespace WidgetZOrder
+// --- REGISTRATION ---
+void UWidgetSubsystem::RegisterWidget(UUserWidget* Widget, EWidgetLayer Layer, EWidgetInputMode InputMode,
+    bool bShowMouseCursor, bool bPauseGame, FName ContextTag)
 {
-    const int32 Background = -10;
-    const int32 Overlay    = 10;  // HUD
-    const int32 Menu       = 50;  // Inventory, Pause
-    const int32 Modal      = 100; // Popups
-    const int32 Critical   = 200; // Loading Screens
-}
-
-void UWidgetSubsystem::RegisterWidget(UUserWidget* Widget, EWidgetType Type, EWidgetMode Mode, 
-    EWidgetProgression Progression, EWidgetPriority Priority, FName ContextTag)
-{
-    if (!Widget) return;
+    if (!Widget) 
+    {
+        UE_LOG(LogTemp, Error, TEXT("WidgetSubsystem: RegisterWidget failed! Widget is NULL."));
+        return;
+    }
 
     // 1. Prevent duplicates
     if (IsWidgetRegistered(Widget))
     {
-        UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: Widget [%s] already registered."), *Widget->GetName());
+        UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: [%s] already registered."), *Widget->GetName());
         return;
     }
 
-    // 2. Determine Z-Order based on Priority
-    int32 ZOrder = WidgetZOrder::Overlay;
-    switch (Priority)
+    // 2. Determine Z-Order based on Layer
+    int32 ZOrder = 10; 
+    switch (Layer)
     {
-        case EWidgetPriority::Low:     ZOrder = WidgetZOrder::Overlay; break;
-        case EWidgetPriority::Medium:  ZOrder = WidgetZOrder::Menu; break;
-        case EWidgetPriority::High:    ZOrder = WidgetZOrder::Modal; break;
-        case EWidgetPriority::Urgent:  ZOrder = WidgetZOrder::Critical; break;
+        case EWidgetLayer::Game:    ZOrder = 10;  break; 
+        case EWidgetLayer::Menu:    ZOrder = 50;  break;
+        case EWidgetLayer::Modal:   ZOrder = 100; break;
+        case EWidgetLayer::System:  ZOrder = 200; break;
     }
 
-    // 3. Add to Viewport (Enforcing Layering)
+    // 3. Add to Viewport (if not already there)
     if (!Widget->IsInViewport())
     {
         Widget->AddToViewport(ZOrder);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: [%s] already in viewport. Skipping Add."), *Widget->GetName());
     }
 
     // 4. Store Data
     FWidgetData NewData;
     NewData.Widget = Widget;
-    NewData.Type = Type;
-    NewData.Mode = Mode;
-    NewData.Progression = Progression;
-    NewData.Priority = Priority;
+    NewData.Layer = Layer;                  // Visual Depth
+    NewData.InputMode = InputMode;          // Behavior Rule
+    NewData.bShowMouseCursor = bShowMouseCursor; 
+    NewData.bPauseGame = bPauseGame; 
     NewData.ContextTag = ContextTag;
 
     ActiveWidgets.Add(Widget, NewData);
 
-    // 5. Special Handling
-    
-    // If this is an Overlay/HUD, store it reference so we can hide it later
-    if (Mode == EWidgetMode::Overlay)
-    {
-        HUDWidget = Widget;
-    }
-    // If this is a Menu or Modal, add to the LIFO Stack
-    else if (Mode == EWidgetMode::Menu || Mode == EWidgetMode::Modal)
+    // 5. Special Handling & Stack Management
+
+    // Stack Logic: If it's NOT "GameOnly", it blocks something, so it goes on the stack.
+    if (InputMode != EWidgetInputMode::GameOnly)
     {
         MenuStack.Add(Widget);
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: Pushed [%s] to Input Stack."), *Widget->GetName());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: [%s] is GameOnly (Toast). Skipping Stack."), *Widget->GetName());
     }
 
-    // 6. Recalculate Input/Pause/Visibility
+    // 6. Refresh State
     RefreshState();
 
-    // Notify listeners
     if (OnWidgetRegistered.IsBound()) OnWidgetRegistered.Broadcast(NewData);
 }
 
@@ -82,22 +83,130 @@ void UWidgetSubsystem::UnregisterWidget(UUserWidget* Widget)
     ActiveWidgets.Remove(Widget);
     Widget->RemoveFromParent();
 
-    // 2. Remove from Stack (if it was in there)
-    // We use RemoveSingle to just take out this specific instance
-    // Note: We cast to TWeakObjectPtr to match the array type
+    // 2. Remove from Stack (safe even if it wasn't there)
     MenuStack.RemoveSingle(Widget);
 
-    // 3. Recalculate Input/Pause/Visibility
+    // 3. Refresh State
     RefreshState();
 
     if (OnWidgetUnregistered.IsBound()) OnWidgetUnregistered.Broadcast(OldData);
 }
 
+
+// --- THE BRAIN ---
+
+void UWidgetSubsystem::RefreshState()
+{
+    APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+    if (!PC) return;
+
+    // --- 1. SETUP ENHANCED INPUT ---
+    UEnhancedInputLocalPlayerSubsystem* EISubsystem = nullptr;
+    if (ULocalPlayer* LP = PC->GetLocalPlayer())
+    {
+        EISubsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>();
+    }
+
+    // --- 2. LOAD IMC FROM SETTINGS ---
+    static UInputMappingContext* UI_IMC = nullptr;
+    
+    // Only try to load if we haven't already
+    if (!UI_IMC)
+    {
+        const UPeripheryUISettings* Settings = GetDefault<UPeripheryUISettings>();
+        if (Settings && !Settings->DefaultUIInputContext.IsNull())
+        {
+            UI_IMC = Settings->DefaultUIInputContext.LoadSynchronous();
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: UI_IMC not set in Project Settings -> Periphery UI Settings!"));
+        }
+    }
+
+    // --- SCENARIO A: STACK EMPTY (Gameplay) ---
+    if (MenuStack.IsEmpty())
+    {
+        SetHUDVisibility(true);
+
+        // Unpause
+        UGameplayStatics::SetGamePaused(GetWorld(), false);
+
+        // Restore Input
+        PC->SetIgnoreMoveInput(false);
+        PC->SetIgnoreLookInput(false);
+        PC->SetShowMouseCursor(false);
+        
+
+        // Input Mode
+        FInputModeGameOnly InputMode;
+        PC->SetInputMode(InputMode);
+
+        // Remove UI IMC
+        if (EISubsystem && UI_IMC)
+        {
+            EISubsystem->RemoveMappingContext(UI_IMC);
+            UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: UI_IMC has been removed!"));
+        }
+    }
+
+    // --- SCENARIO B: MENUS OPEN ---
+    else
+    {
+        // Add UI IMC
+        if (EISubsystem && UI_IMC)
+        {
+            EISubsystem->AddMappingContext(UI_IMC, 1); 
+            UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: UI_IMC has been added!"));
+        }
+
+        // Get Top Widget Data
+        UUserWidget* TopWidget = MenuStack.Last().Get();
+        FWidgetData Data;
+        
+        if (TopWidget && ActiveWidgets.Contains(TopWidget))
+        {
+            Data = ActiveWidgets[TopWidget];
+        }
+
+        // Apply Pause
+        UGameplayStatics::SetGamePaused(GetWorld(), Data.bPauseGame);
+
+        // Apply Input Blocking (Hard Block)
+        PC->SetIgnoreMoveInput(true);
+        PC->SetIgnoreLookInput(true);
+        SetHUDVisibility(false); 
+
+        EMouseLockMode LockMode = Data.bShowMouseCursor ? EMouseLockMode::DoNotLock : EMouseLockMode::LockAlways;
+
+        if (Data.InputMode == EWidgetInputMode::UIOnly)
+        {
+            FInputModeUIOnly InputMode;
+            if (TopWidget  && Data.bShowMouseCursor) InputMode.SetWidgetToFocus(TopWidget->TakeWidget());
+            InputMode.SetLockMouseToViewportBehavior(LockMode);
+            PC->SetInputMode(InputMode);
+        }
+        else // GameAndUI (Fallback / Interactive)
+        {
+            FInputModeGameAndUI InputMode;
+            if (TopWidget && Data.bShowMouseCursor) InputMode.SetWidgetToFocus(TopWidget->TakeWidget());
+            InputMode.SetLockMouseToViewportBehavior(LockMode);
+            PC->SetInputMode(InputMode);
+        }
+        // Apply ShowMouseCursor after SetWidgetToFocus
+        PC->SetShowMouseCursor(Data.bShowMouseCursor);
+    }
+}
+
+
+
+// --- STACK CONTROL ---
+
 bool UWidgetSubsystem::PopTopWidget()
 {
-    // If stack is empty, we can't go back
     if (MenuStack.IsEmpty()) return false;
 
+    // Remove the last widget added to the stack
     TWeakObjectPtr<UUserWidget> TopWidget = MenuStack.Last();
 
     if (TopWidget.IsValid())
@@ -107,35 +216,16 @@ bool UWidgetSubsystem::PopTopWidget()
     }
     else
     {
-        // Prune invalid widget and try again
+        // Clean up invalid entry and try again
         MenuStack.Pop();
         return PopTopWidget();
     }
-    
-
-    return false;
-}
-
-bool UWidgetSubsystem::GetTopWidget(UUserWidget*& Widget)
-{
-    if (MenuStack.IsEmpty()) return false;
-
-    UUserWidget* TopWidget = MenuStack.Last().Get();
-
-    if (IsValid(TopWidget))
-    {
-        Widget = TopWidget;
-        return true;
-    }
-    else
-    {
-        return false;
-    }
+   
 }
 
 void UWidgetSubsystem::CloseAllMenus()
 {
-    // Loop backwards safely to close all stack items
+    // Iterate backwards to close everything in the stack
     for (int32 i = MenuStack.Num() - 1; i >= 0; i--)
     {
         if (MenuStack[i].IsValid())
@@ -143,10 +233,21 @@ void UWidgetSubsystem::CloseAllMenus()
             UnregisterWidget(MenuStack[i].Get());
         }
     }
-    
-    // Safety clear
     MenuStack.Empty();
     RefreshState();
+}
+
+bool UWidgetSubsystem::CloseWidgetByContext(FName ContextTag)
+{
+    if (ContextTag.IsNone()) return false;
+
+    UUserWidget* Target = FindWidgetByTag(ContextTag);
+    if (Target)
+    {
+        UnregisterWidget(Target);
+        return true;
+    }
+    return false;
 }
 
 // --- QUERIES ---
@@ -162,7 +263,7 @@ FWidgetData UWidgetSubsystem::GetWidgetData(UUserWidget* Widget) const
     {
         return ActiveWidgets[Widget];
     }
-    return FWidgetData(); // Return empty struct
+    return FWidgetData(); 
 }
 
 bool UWidgetSubsystem::IsAnyMenuOpen() const
@@ -170,56 +271,78 @@ bool UWidgetSubsystem::IsAnyMenuOpen() const
     return !MenuStack.IsEmpty();
 }
 
-
-// --- THE BRAIN (Internal State Machine) ---
-
-void UWidgetSubsystem::RefreshState()
+bool UWidgetSubsystem::GetTopWidget(UUserWidget*& Widget)
 {
-    APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-    if (!PC) return;
+    if (MenuStack.IsEmpty()) return false;
+    
+    Widget = MenuStack.Last().Get();
+    return IsValid(Widget);
+}
 
-    // SCENARIO A: STACK IS EMPTY (Just Gameplay)
-    if (MenuStack.IsEmpty())
+UUserWidget* UWidgetSubsystem::FindWidgetByTag(FName Tag) const
+{
+    if (Tag.IsNone()) return nullptr;
+
+    for (const auto& Pair : ActiveWidgets)
     {
-        // 1. Show HUD
-        if (HUDWidget) HUDWidget->SetVisibility(ESlateVisibility::Visible);
-
-        // 2. Unpause
-        UGameplayStatics::SetGamePaused(GetWorld(), false);
-
-        // 3. Restore Input
-        FInputModeGameOnly InputMode;
-        PC->SetInputMode(InputMode);
-        PC->SetShowMouseCursor(false);
+        if (Pair.Value.ContextTag == Tag && Pair.Key.IsValid())
+        {
+            return Pair.Key.Get();
+        }
     }
-    // SCENARIO B: WE HAVE MENUS OPEN
-    else
+    return nullptr;
+}
+
+void UWidgetSubsystem::SetHUDVisibility(bool bVisible)
+{
+
+    ESlateVisibility Visibility = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Hidden;
+
+    // Iterate over ALL registered widgets
+    for (auto& Pair : ActiveWidgets)
     {
-        // 1. Hide HUD (to prevent clutter/clicks)
-        if (HUDWidget) HUDWidget->SetVisibility(ESlateVisibility::Hidden);
-
-        // 2. Get the Top Widget
-        UUserWidget* TopWidget = MenuStack.Last().Get();
-
-        // 3. Determine if we Pause (Only "Menu" mode pauses, "Modal" might not)
-        if (TopWidget && ActiveWidgets.Contains(TopWidget))
+        // If this widget is on the GAME layer (HUD) show it
+        if (Pair.Value.Layer == EWidgetLayer::Game)
         {
-            EWidgetMode CurrentMode = ActiveWidgets[TopWidget].Mode;
-            
-            // If it's a full Menu, Pause. If it's just a Modal Popup, maybe don't pause?
-            // (You can simplify this to always pause if you prefer)
-            bool bShouldPause = (CurrentMode == EWidgetMode::Menu);
-            UGameplayStatics::SetGamePaused(GetWorld(), bShouldPause);
+            if (UUserWidget* HUD = Pair.Key.Get())
+            {
+                if (HUD->Implements<UWidgetInterface>()) IWidgetInterface::Execute_SetWidgetVisibility(HUD, bVisible);
+                else HUD->SetVisibility(Visibility);
+            }
         }
+    }
+}
 
-        // 4. Set Input Focus to the Top Widget
-        FInputModeGameAndUI InputMode;
-        if (TopWidget)
-        {
-            InputMode.SetWidgetToFocus(TopWidget->TakeWidget());
-        }
-        InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-        PC->SetInputMode(InputMode);
-        PC->SetShowMouseCursor(true);
+
+// --- MENUS ---
+
+void UWidgetSubsystem::OpenMenu(TSubclassOf<UUserWidget> WidgetClass)
+{
+    if (!WidgetClass) return;
+
+    // 1. Clean up existing menu if open
+    CloseMenu();
+
+    // 2. Create the new widget
+    if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+    {
+        CurrentMenuWidget = CreateWidget<UUserWidget>(PC, WidgetClass);
+        RegisterWidget(
+                CurrentMenuWidget, 
+                EWidgetLayer::Menu,      // Layer
+                EWidgetInputMode::UIOnly,// Input Mode
+                true,                    // Show Mouse
+                false,                   // Pause Game (Optional, Main Menu usually doesn't pause time, just input)
+                FName("MainMenu")        // Context Tag
+            );
+    }
+}
+
+void UWidgetSubsystem::CloseMenu()
+{
+    if (CurrentMenuWidget)
+    {
+        CurrentMenuWidget->RemoveFromParent();
+        CurrentMenuWidget = nullptr;
     }
 }

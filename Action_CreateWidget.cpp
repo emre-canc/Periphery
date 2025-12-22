@@ -1,40 +1,65 @@
 #include "Missions/Actions/Action_CreateWidget.h"
 #include "GameFramework/PlayerController.h"
-#include "Engine/GameInstance.h"
+#include "Kismet/GameplayStatics.h"
+#include "Blueprint/UserWidget.h"
+#include "Subsystems/WidgetSubsystem.h" 
 
 void UAction_CreateWidget::ExecuteAction(AActor* ContextActor) const
 {
-    if (!ContextActor || !WidgetData) return;
+    // 1. Validation
+    if (!WidgetConfig)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Action_CreateWidget: WidgetConfig Payload is null."));
+        return;
+    }
 
-    // 1. Get Player Controller (Required to own a widget)
+    // 2. Get Player Controller
     APlayerController* PC = nullptr;
     if (APawn* Pawn = Cast<APawn>(ContextActor))
     {
         PC = Cast<APlayerController>(Pawn->GetController());
     }
-    
-    // Fallback: If Context is not a pawn, try getting first local player
-    if (!PC && ContextActor->GetWorld())
+    // Fallback logic
+    if (!PC && ContextActor)
     {
-        PC = ContextActor->GetWorld()->GetFirstPlayerController();
+        if (UWorld* World = ContextActor->GetWorld())
+        {
+            PC = World->GetFirstPlayerController();
+        }
     }
 
     if (!PC) return;
 
-    // 2. Get Class from Payload
-    TSubclassOf<UUserWidget> ClassToSpawn = WidgetData->GetWidgetClass();
-    if (!ClassToSpawn) return;
+    // 3. Get Class from Payload (WidgetConfig)
+    TSubclassOf<UUserWidget> ClassToSpawn = WidgetConfig->GetWidgetClass();
+    if (!ClassToSpawn) 
+    {
+        UE_LOG(LogTemp, Error, TEXT("Action_CreateWidget: WidgetConfig has no Widget Class selected!"));
+        return;
+    }
 
-    // 3. Create Widget
+    // 4. Get Subsystem
+    UGameInstance* GI = PC->GetGameInstance();
+    UWidgetSubsystem* WidgetSubsystem = GI ? GI->GetSubsystem<UWidgetSubsystem>() : nullptr;
+
+    if (!WidgetSubsystem) return;
+
+    // 5. Create Widget
     UUserWidget* NewWidget = CreateWidget<UUserWidget>(PC, ClassToSpawn);
+
     if (NewWidget)
     {
-        // 4. THE MAGIC: Let the Payload apply its specific data
-        WidgetData->InitializeWidget(NewWidget);
+        // 6. Apply Payload Content (The Text/Images from your BP Struct)
+        WidgetConfig->InitializeWidget(NewWidget);
 
-        if (bAddToViewport)
-        {
-            NewWidget->AddToViewport();
-        }
+        // 7. Register with Subsystem (Using the Rules from this Action)
+        WidgetSubsystem->RegisterWidget(
+            NewWidget, 
+            Layer,              
+            InputMode,          
+            bShowMouseCursor,   
+            bPauseGame,         
+            ContextTag          
+        );
     }
 }
