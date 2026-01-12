@@ -55,6 +55,6 @@ public:
 
     // --- System ---
     
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity")
-    void GetElectricityTag(FGameplayTag& ElectricityTag);
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity|Circuit")
+    void GetCircuitTag(FGameplayTag& CircuitTag);
 };

@@ -57,10 +57,6 @@ public:
 
 	const TMap<FGuid, TWeakObjectPtr<AActor>>& GetRegisteredActorsMap() const { return GuidToActorMap; }
 
-	// ---------- Actions ----------
-	void SendCommandToActor(FGameplayTag ActorTag, FName CommandName);
-    // void PlayOrStopSequence(FGameplayTag SequenceTag);  // use Commands "PlaySequence" instead
-
 protected:
 
 	//Tags

@@ -2,7 +2,7 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "GameplayTagContainer.h"
-#include "Subsystems/ActorRegistrySubsystem.h"
+// #include "Subsystems/ActorRegistrySubsystem.h" //maybe not needed
 #include "MissionAction.generated.h"
 
 
@@ -14,40 +14,10 @@ class INSIDETFV03_API UMissionAction : public UObject
 
 public:
     // The main entry point. 
-    // We pass ContextActor so the Action can find the World/GameInstance.
+    // We pass ContextActor (Player Character) so the Action can find the World/GameInstance.
     virtual void ExecuteAction(AActor* ContextActor) const {};
 };
 
 
-
-//**----------------------*//
-UCLASS(DisplayName = "Send Command To Actor")
-class INSIDETFV03_API UAction_SendCommand : public UMissionAction
-{
-    GENERATED_BODY()
-
-public:
-    UPROPERTY(EditAnywhere, Category = "Config")
-    FGameplayTag TargetActorTag;
-
-    UPROPERTY(EditAnywhere, Category = "Config")
-    FName CommandName;
-
-    virtual void ExecuteAction(AActor* ContextActor) const override;
-	
-};
-
-UCLASS(DisplayName = "Play/Stop Level Sequence")
-class INSIDETFV03_API UAction_Sequence : public UMissionAction
-{
-    GENERATED_BODY()
-
-public:
-    UPROPERTY(EditAnywhere, Category = "Config")
-    FGameplayTag SequenceTag;
-
-    virtual void ExecuteAction(AActor* ContextActor) const override;
-
-};
 
 

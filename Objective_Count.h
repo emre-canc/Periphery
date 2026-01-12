@@ -15,13 +15,13 @@ class INSIDETFV03_API UObjective_Count : public UMissionObjective
     GENERATED_BODY()
 
 public:
-    UPROPERTY(EditAnywhere, Category = "3. Rules")
+    UPROPERTY(EditAnywhere, Category = "Rules")
     FGameplayTag TargetEvent;
 
-    UPROPERTY(EditAnywhere, Category = "3. Rules")
+    UPROPERTY(EditAnywhere, Category = "Rules")
     int32 TargetCount = 1;
 
-    UPROPERTY(EditAnywhere, Category = "3. Rules")
+    UPROPERTY(EditAnywhere, Category = "Rules")
     bool bRequireUniqueSources = false;
 
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;

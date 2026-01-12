@@ -33,7 +33,4 @@ public:
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Registry")
     FGameplayTagContainer GetAllTags() const;
 
-    // Generic Command Handler (e.g. "Trigger", "Reset", "Open")
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Registry")
-    void HandleCommand(FName Command);
 };

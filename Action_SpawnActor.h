@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(DisplayName = "Spawn Actor - WIP")
 class UAction_SpawnActor : public UMissionAction
 {
 	GENERATED_BODY()

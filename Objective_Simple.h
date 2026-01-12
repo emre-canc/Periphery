@@ -10,7 +10,7 @@ class INSIDETFV03_API UObjective_Simple : public UMissionObjective
     GENERATED_BODY()
 public:
 
-    UPROPERTY(EditAnywhere, Category = "3. Rules")
+    UPROPERTY(EditAnywhere, Category = "Rules")
     FGameplayTag TargetEvent;
     
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;

@@ -20,21 +20,17 @@ public:
      * Updates internal state and notifies all actors on that circuit.
      * Checks hierarchy: You cannot turn a Child Grid ON if the Parent Grid is OFF.
      */
-    UFUNCTION(BlueprintCallable, Category="Electricity")
+    UFUNCTION(BlueprintCallable, Category="Electricity|Circuit")
     void SetCircuitState(FGameplayTag CircuitTag, bool bPowerOn);
 
     // ---------- QUERIES ----------
 
-    UFUNCTION(BlueprintPure, Category="Electricity")
+    UFUNCTION(BlueprintPure, Category="Electricity|Circuit")
     bool IsCircuitOn(FGameplayTag CircuitTag) const;
     
     // Returns EVERYTHING connected to the grid (Sources, Lights, Switches)
     UFUNCTION(BlueprintPure, Category="Electricity")
     TArray<AActor*> GetGridActors() const;
-
-    // Returns only the Power Sources
-    UFUNCTION(BlueprintPure, Category="Electricity")
-    TArray<AActor*> GetFuseBoxActors() const;
 
     // Returns only the Lights (Convenience function)
     UFUNCTION(BlueprintPure, Category="Electricity")

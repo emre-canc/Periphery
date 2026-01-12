@@ -9,7 +9,7 @@ class INSIDETFV03_API UObjective_Checklist : public UMissionObjective
     GENERATED_BODY()
 
 public:
-    UPROPERTY(EditAnywhere, Category = "3. Rules")
+    UPROPERTY(EditAnywhere, Category = "Rules")
     TArray<FGameplayTag> RequiredTags;
 
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;

@@ -231,30 +231,7 @@ TArray<AActor*> UActorRegistrySubsystem::GetAllSaveableActors() const
     return ValidActors;
 }
 
-// ---------- Actions ----------
-void UActorRegistrySubsystem::SendCommandToActor(FGameplayTag ActorTag, FName CommandName)
-{
-    if (!ActorTag.IsValid() || CommandName.IsNone()) 
-    {
-        UE_LOG(LogTemp, Warning, TEXT("ActorRegistrySubsystem: SendCommand ERROR - Invalid Tag or Command"));
-        return;
-    }
 
-    TArray<AActor*> Actors = GetActors(ActorTag);
 
-    for (AActor* A : Actors)
-    {
-        // 1. Check for Interface Implementation
-        if (A && A->Implements<UActorRegistryInterface>())
-        {
-            // 2. Execute the Interface call safely
-            IActorRegistryInterface::Execute_HandleCommand(A, CommandName);
-        }
-        else if (A)
-        {
-            UE_LOG(LogTemp, Verbose, TEXT("ActorRegistrySubsystem: Actor %s found for tag %s but does not implement ActorRegistryInterface."), *A->GetName(), *ActorTag.ToString());
-        }
-    }
-}
 
-// void UActorRegistrySubsystem::PlayOrStopSequence(FGameplayTag SequenceTag) // use Commands "PlaySequence" instead
+

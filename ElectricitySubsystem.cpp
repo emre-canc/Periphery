@@ -80,18 +80,6 @@ TArray<AActor*> UElectricitySubsystem::GetGridActors() const
     return TArray<AActor*>();
 }
 
-TArray<AActor*> UElectricitySubsystem::GetFuseBoxActors() const
-{
-    if (const UGameInstance* GI = GetWorld()->GetGameInstance())
-    {
-        if (auto* Registry = GI->GetSubsystem<UActorRegistrySubsystem>())
-        {
-        return Registry->GetActors(FGameplayTag::RequestGameplayTag("Electricity.Source.Fusebox"));
-        }
-    }
-    return TArray<AActor*>();
-}
-
 TArray<AActor*> UElectricitySubsystem::GetLightActors() const
 {
     if (const UGameInstance* GI = GetWorld()->GetGameInstance())

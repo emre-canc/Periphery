@@ -31,12 +31,13 @@ struct FObjectiveStepDefinition
 
 	UPROPERTY(EditAnywhere, Instanced, Category = "Actions")
 	TArray<TObjectPtr<UMissionAction>> StepStartActions;
+
+	UPROPERTY(EditAnywhere, Instanced, Category = "Actions")
+	TArray<TObjectPtr<UMissionAction>> StepCompleteActions;
 	
     UPROPERTY(EditAnywhere, Category = "Config")
     TArray<FStepRequirement> RequiredEventsToCompleteStep;
 
-	UPROPERTY(EditAnywhere, Instanced, Category = "Actions")
-	TArray<TObjectPtr<UMissionAction>> StepCompleteActions;
 };
 
 UCLASS(DisplayName = "Sequence (Ordered Steps)")
@@ -45,7 +46,7 @@ class INSIDETFV03_API UObjective_Sequence : public UMissionObjective
     GENERATED_BODY()
 
 public:
-    UPROPERTY(EditAnywhere, Category = "3. Rules")
+    UPROPERTY(EditAnywhere, Category = "Rules")
     TArray<FObjectiveStepDefinition> Steps;
 	
 	virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;

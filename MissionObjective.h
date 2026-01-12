@@ -11,7 +11,7 @@
  * Base class for all Mission Objectives.
  * "EditInlineNew" allows you to create this object directly inside the MissionData asset.
  */
-UCLASS(Abstract, BlueprintType, EditInlineNew, DefaultToInstanced)
+UCLASS(Abstract, BlueprintType, EditInlineNew, DefaultToInstanced, meta=(PrioritizeCategories="Identity Activation Rules Outcome"))
 class INSIDETFV03_API UMissionObjective : public UObject
 {
     GENERATED_BODY()
