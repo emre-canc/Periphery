@@ -19,6 +19,6 @@ public:
 
     // Generic Command Handler (e.g. "Trigger", "Reset", "Open")
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Command")
-    void HandleCommand(FGameplayTag CommandTag);
+    void ReceiveCommand(FGameplayTag CommandTag);
     
 };

@@ -19,19 +19,17 @@ UDataLayerManager* ULevelStateSubsystem::GetDataLayerManager() const
 
 // --- Gameplay Functions ---
 
-void ULevelStateSubsystem::SetDataLayerActive(FName LayerName, bool bIsActive)
+void ULevelStateSubsystem::SetDataLayerState(FName LayerName, EDataLayerRuntimeState TargetState)
 {
     UDataLayerManager* Manager = GetDataLayerManager();
     if (!Manager) return;
 
-    // Iterate through all layers to find the one matching the name
+    // Iterate through all layers
     for (const UDataLayerInstance* LayerInstance : Manager->GetDataLayerInstances())
     {
+        // Compare Names (Safe generic way)
         if (LayerInstance && LayerInstance->GetDataLayerShortName() == LayerName.ToString())
         {
-            // Determine the target state
-            EDataLayerRuntimeState TargetState = bIsActive ? EDataLayerRuntimeState::Activated : EDataLayerRuntimeState::Unloaded;
-            
             if (const UDataLayerAsset* Asset = LayerInstance->GetAsset())
             {
                 Manager->SetDataLayerRuntimeState(Asset, TargetState);
@@ -39,8 +37,8 @@ void ULevelStateSubsystem::SetDataLayerActive(FName LayerName, bool bIsActive)
             return;
         }
     }
-
-    UE_LOG(LogTemp, Warning, TEXT("LevelStateSubsystem: Could not find Data Layer named '%s'"), *LayerName.ToString());
+    
+    UE_LOG(LogTemp, Warning, TEXT("LevelState: Layer '%s' not found."), *LayerName.ToString());
 }
 
 bool ULevelStateSubsystem::IsDataLayerActive(FName LayerName) const

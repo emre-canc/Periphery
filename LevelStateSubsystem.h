@@ -19,7 +19,7 @@ public:
 
     /** Turn a Data Layer On or Off by its Label (Name) */
     UFUNCTION(BlueprintCallable, Category="LevelState")
-    void SetDataLayerActive(FName LayerName, bool bIsActive);
+    void SetDataLayerState(FName LayerName, EDataLayerRuntimeState TargetState);
 
     /** Check if a layer is currently active */
     UFUNCTION(BlueprintPure, Category="LevelState")

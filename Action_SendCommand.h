@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Subsystems/ActorRegistrySubsystem.h"
 #include "Missions/Actions/MissionAction.h"
 #include "Action_SendCommand.generated.h"
 

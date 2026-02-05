@@ -8,7 +8,7 @@ void UAction_PlaySound::ExecuteAction(AActor* ContextActor) const
 
     // 1. Spawn the Sound (Fire and Forget)
     UAudioComponent* AudioComp = UGameplayStatics::SpawnSoundAtLocation(
-        this,
+        ContextActor,
         MetaSoundBase,
         ContextActor->GetActorLocation()
     );

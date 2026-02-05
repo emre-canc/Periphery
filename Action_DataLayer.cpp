@@ -1,15 +1,16 @@
-
-
 #include "Missions/Actions/Action_DataLayer.h"
+#include "Engine/World.h"
 
 void UAction_DataLayer::ExecuteAction(AActor* ContextActor) const
 {
     if (!ContextActor) return;
 
-    // Get the World from the Actor
     UWorld* World = ContextActor->GetWorld();
     if (!World) return;
 
-    // Access the Subsystem from the WORLD
-
+    // Access the Subsystem from the WORLD (because Data Layers are a World concept)
+    if (auto* LevelState = World->GetSubsystem<ULevelStateSubsystem>())
+    {
+        LevelState->SetDataLayerState(LayerName, TargetState);
+    }
 }

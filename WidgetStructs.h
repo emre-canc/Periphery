@@ -9,8 +9,8 @@
 UENUM(BlueprintType)
 enum class EWidgetLayer : uint8
 {
-    Game        UMETA(DisplayName="Game (HUD)"),       // Z-Order 10
-    Menu        UMETA(DisplayName="Menu (Settings)"),  // Z-Order 50
+    Game        UMETA(DisplayName="Game (HUD/Gameplay)"),       // Z-Order 10
+    Menu        UMETA(DisplayName="Menu (Settings/Text)"),  // Z-Order 50
     Modal       UMETA(DisplayName="Modal (Popup)"),    // Z-Order 100
     System      UMETA(DisplayName="System (Toast)")    // Z-Order 200
 };
@@ -19,14 +19,14 @@ enum class EWidgetLayer : uint8
 UENUM(BlueprintType)
 enum class EWidgetInputMode : uint8
 {
-    // Input goes to Player Controller. UI is ignored.
+    // Input goes to Player Controller. UI is ignored. 
     GameOnly        UMETA(DisplayName="Game Only"),
 
-    // Input goes to UI, Player Controller is ignored.
+    // Input goes to Widget, Player Controller is ignored. 
     UIOnly          UMETA(DisplayName="UI Only"),
     
 
-    // If the UI ignores input, it falls through to the Player Controller.
+    // If the Widget ignores input, it falls through to the Player Controller.
     GameAndUI       UMETA(DisplayName="Game and UI")
     
 };

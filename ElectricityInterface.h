@@ -33,14 +33,14 @@ public:
 
     // --- Flicker Category ---
 
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity|Flicker")
-    void StartFlicker();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity|Broken")
+    void StartBroken();
 
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity|Flicker")
-    void StopFlicker();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity|Broken")
+    void StopBroken();
 
-    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity|Flicker")
-    void IsFlickering(bool& bIsFlickering) const;
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Electricity|Broken")
+    void IsBroken(bool& bIsBroken) const;
 
     // --- Power Category (Grid/Subsystem) ---
 

@@ -25,9 +25,15 @@ public:
 
     /** Checks if an item exists. Returns true if found, and whether it is a Key Item. */
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Inventory")
-    void FindItemByTag(FGameplayTag ItemTag, FInventoryData& ItemData, bool& bFound, bool& bKeyItem);
+    void FindItemByTag(FGameplayTag ItemTag, FInventoryData& ItemData, bool& bFound, EItemCategory& ItemCategory);
 
     /** Removes one instance of the item. Returns true if consumed. */
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Inventory")
-    void ConsumeItem(FGameplayTag ItemTag, bool& bConsumed);
+    void ConsumeItem(FGameplayTag ItemTag, bool& bConsumed, bool& bDepleted);
+
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Inventory")
+    void CanAddToInventory(FGameplayTag ItemTag, FInventoryData ItemData, bool& bSuccess);
+       
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Inventory")
+    void HolsterEquippedItem();
 };

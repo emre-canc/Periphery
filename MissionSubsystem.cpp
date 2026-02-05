@@ -16,7 +16,7 @@ void UMissionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Initialized"));
 
 	FString NetMode = (GetWorld()->GetNetMode() == NM_Client) ? "Client" : "Server";
-	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem Init [%s]"), *NetMode);
+	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Init [%s]"), *NetMode);
 
 }
 
@@ -48,7 +48,7 @@ void UMissionSubsystem::StartMission(FGameplayTag MissionID)
 	else 
 	{
 		//Request Async Load.
-        UE_LOG(LogTemp, Log, TEXT("StartMission: Async loading asset for %s..."), *MissionID.ToString());
+        UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: StartMission: Async loading asset for %s..."), *MissionID.ToString());
 
         // Create the delegate
         FStreamableDelegate Delegate = FStreamableDelegate::CreateUObject
@@ -88,32 +88,46 @@ bool UMissionSubsystem::IsMissionActive(FGameplayTag MissionID) const
 	return Rt && Rt->MissionState == EProgressState::InProgress;
 }
 
-
-
 void UMissionSubsystem::ActivateObjective(FGameplayTag MissionID, FGameplayTag ObjectiveID)
 {
+    // LOG: Entry
+    UE_LOG(LogTemp, Log, TEXT("[Mission] Request Activate: %s (Mission: %s)"), *ObjectiveID.ToString(), *MissionID.ToString());
 
-    //Check if valid section
-    if (!IsMissionActive(MissionID)) return;
+    // Check if valid section
+    if (!IsMissionActive(MissionID)) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Mission] Failed to activate %s: Mission %s is not active."), *ObjectiveID.ToString(), *MissionID.ToString());
+        return;
+    }
 
     const UMissionObjective* ObjDef = GetObjectiveFromAsset(MissionID, ObjectiveID);
-    if (!ObjDef) return;
-
+    if (!ObjDef) 
+    {
+        UE_LOG(LogTemp, Error, TEXT("[Mission] Failed to activate %s: Objective Definition not found in Asset."), *ObjectiveID.ToString());
+        return;
+    }
 
     // Is valid. Start Activate Objective section
     FMissionRuntimeState* MissionRt = GetActiveMissionRuntime(MissionID);
-    check(MissionRt);
+    check(MissionRt); // This ensures we crash hard if logic is broken (since we checked IsMissionActive above)
+
+    // LOG: State Change
+    UE_LOG(LogTemp, Display, TEXT("[Mission] ACTIVATED: %s added to ActiveObjectives."), *ObjectiveID.ToString());
 
     FObjectiveRuntimeState& ObjRt = MissionRt->ActiveObjectives.FindOrAdd(ObjectiveID);
     ObjRt.ObjectiveID = ObjectiveID;
     
     // 1. Delegate Initialization to the Object
-    // (Sets ProgressState to InProgress, sets up generic storage counters)
     ObjDef->InitializeRuntime(ObjRt);
 
     // 2. Run Start Actions
-    // We pass the PlayerPawn as context (or nullptr if none available)
     AActor* Context = GetGameInstance()->GetFirstLocalPlayerController()->GetPawn();
+    
+    if (ObjDef->StartActions.Num() > 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("[Mission] Running %d Start Actions for %s..."), ObjDef->StartActions.Num(), *ObjectiveID.ToString());
+    }
+
     RunActions(ObjDef->StartActions, Context);
 
     OnObjectiveStarted.Broadcast(MissionID, ObjectiveID);
@@ -121,20 +135,44 @@ void UMissionSubsystem::ActivateObjective(FGameplayTag MissionID, FGameplayTag O
 
 void UMissionSubsystem::CompleteObjective(FGameplayTag MissionID, FGameplayTag ObjectiveID, bool bSuccess)
 {
-    // --- 1. OPTIMIZATION: Direct Map Lookups (Avoid Helper Function Overhead) ---
+    // LOG: Entry Point (Helpful to see the start of the frame)
+    UE_LOG(LogTemp, Log, TEXT("MissionSubsystem:  Request Complete: %s (Mission: %s) Success: %d"), 
+        *ObjectiveID.ToString(), *MissionID.ToString(), bSuccess);
+
+    // --- 1. OPTIMIZATION: Direct Map Lookups ---
     
     // Lookup Mission State ONCE
     FMissionRuntimeState* MissionRt = ActiveMissions.Find(MissionID);
-    if (!MissionRt) return;
+    if (!MissionRt) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("MissionSubsystem:  Failed: Mission %s is not active."), *MissionID.ToString());
+        return;
+    }
 
     // Lookup Asset ONCE
     const UMissionData* MissionAsset = GetMissionAsset(MissionID);
-    if (!MissionAsset) return;
+    if (!MissionAsset) 
+    {
+        UE_LOG(LogTemp, Error, TEXT("MissionSubsystem:  Failed: DataAsset for %s missing."), *MissionID.ToString());
+        return;
+    }
 
-    // Lookup Objective State ONCE (Directly from the Mission State we just found)
+    // Lookup Objective State ONCE
     FObjectiveRuntimeState* ObjRt = MissionRt->ActiveObjectives.Find(ObjectiveID);
+    
     // Validate State
-    if (!ObjRt || ObjRt->ObjectiveState != EProgressState::InProgress) return;
+    if (!ObjRt)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("MissionSubsystem:  Failed: Objective %s is not in ActiveObjectives list."), *ObjectiveID.ToString());
+        return;
+    }
+    if (ObjRt->ObjectiveState != EProgressState::InProgress)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("MissionSubsystem:  Failed: Objective %s is already %s."), 
+            *ObjectiveID.ToString(), 
+            (ObjRt->ObjectiveState == EProgressState::Completed ? TEXT("Completed") : TEXT("Failed")));
+        return;
+    }
 
     // Find Definition locally
     const UMissionObjective* ObjDef = nullptr;
@@ -146,7 +184,11 @@ void UMissionSubsystem::CompleteObjective(FGameplayTag MissionID, FGameplayTag O
             break;
         }
     }
-    if (!ObjDef) return;
+    if (!ObjDef) 
+    {
+        UE_LOG(LogTemp, Error, TEXT("MissionSubsystem:  Failed: Objective Definition %s not found in Asset."), *ObjectiveID.ToString());
+        return;
+    }
 
     // --- 2. Update State ---
 
@@ -157,12 +199,14 @@ void UMissionSubsystem::CompleteObjective(FGameplayTag MissionID, FGameplayTag O
     MissionRt->CompletedObjectiveIDs.Add(ObjectiveID);
     MissionRt->ActiveObjectives.Remove(ObjectiveID);
 
-    // Broadcast (Safe to do now that state is updated)
+    // LOG: Vital State Change (Using Display so it's White/Visible in logs)
+    UE_LOG(LogTemp, Display, TEXT("MissionSubsystem:  SUCCESS: %s set to %s."), 
+        *ObjectiveID.ToString(), (bSuccess ? TEXT("Completed") : TEXT("Failed")));
+
+    // Broadcast
     OnObjectiveCompleted.Broadcast(MissionID, ObjectiveID, bSuccess);
 
     // --- 3. THE OnComplete LOOP ---
-    // Notify other active objectives that this one finished.
-    // We copy the keys because the loop might modify the map (via recursion).
     if (bSuccess)
     {
         TArray<FGameplayTag> ActiveIDs;
@@ -170,9 +214,8 @@ void UMissionSubsystem::CompleteObjective(FGameplayTag MissionID, FGameplayTag O
 
         for (const FGameplayTag& SearchID : ActiveIDs)
         {
-            if (SearchID == ObjectiveID) continue; // Don't notify self
+            if (SearchID == ObjectiveID) continue; 
 
-            // Fast lookup since we are already in the context of this mission
             FObjectiveRuntimeState* OtherObjRt = MissionRt->ActiveObjectives.Find(SearchID);
             const UMissionObjective* OtherObjDef = GetObjectiveFromAsset(MissionID, SearchID);
 
@@ -184,11 +227,13 @@ void UMissionSubsystem::CompleteObjective(FGameplayTag MissionID, FGameplayTag O
                     // Did that finish the Gatekeeper?
                     if (OtherObjDef->IsComplete(*OtherObjRt))
                     {
+                        // LOG: Critical - Identifying Chain Reactions
+                        UE_LOG(LogTemp, Display, TEXT("MissionSubsystem:  CHAIN REACTION: %s triggered completion of %s."), 
+                            *ObjectiveID.ToString(), *SearchID.ToString());
+
                         // RECURSION: Finish the Gatekeeper immediately
                         CompleteObjective(MissionID, SearchID, true);
                         
-                        // Note: MissionRt might be invalid here if the recursion finished the mission!
-                        // In a robust system, check if Mission still exists before continuing loop.
                         if (!ActiveMissions.Contains(MissionID)) return;
                     }
                 }
@@ -200,31 +245,24 @@ void UMissionSubsystem::CompleteObjective(FGameplayTag MissionID, FGameplayTag O
     
     if (bSuccess)
     {
-        // Use local player context
-        AActor* Context = GetGameInstance()->GetFirstLocalPlayerController()->GetPawn();
-        
-        // Execute Actions
-        RunActions(ObjDef->CompleteActions, Context);
+        // LOG: Flow confirmation
+        UE_LOG(LogTemp, Log, TEXT("MissionSubsystem:  Processing Actions/Next Objectives for %s..."), *ObjectiveID.ToString());
 
-        // Activate Next
+        AActor* Context = GetGameInstance()->GetFirstLocalPlayerController()->GetPawn();
+        RunActions(ObjDef->CompleteActions, Context);
         ActivateNextObjectives(MissionID, ObjDef->NextObjectiveIDs);
     }
 
     // --- 5. Check Mission Completion ---
     
-    // OPTIMIZATION: If there are still Active Objectives, the mission CANNOT be done.
-    // This saves us from iterating the entire array in 90% of cases.
     if (MissionRt->ActiveObjectives.Num() > 0)
     {
         return; 
     }
 
-    // If active list is empty, we MUST verify against the Asset 
-    // (in case there are objectives that haven't started yet).
     bool bAllCompleted = true;
     for (const auto& Obj : MissionAsset->ObjectiveArray)
     {
-        // Check if the objective exists AND hasn't been completed yet
         if (Obj && !MissionRt->CompletedObjectiveIDs.Contains(Obj->ObjectiveID))
         {
             bAllCompleted = false;
@@ -234,6 +272,8 @@ void UMissionSubsystem::CompleteObjective(FGameplayTag MissionID, FGameplayTag O
 
     if (bAllCompleted)
     {
+        // LOG: Vital - Mission Finish
+        UE_LOG(LogTemp, Display, TEXT("MissionSubsystem:  MISSION COMPLETE: %s has no remaining objectives."), *MissionID.ToString());
         FinishMission(MissionID, true);
     }
 }
@@ -270,7 +310,7 @@ const UMissionObjective* UMissionSubsystem::GetObjectiveFromAsset(FGameplayTag M
 
     if (!ObjDef)
     {
-        UE_LOG(LogTemp, Warning, TEXT("ActivateObjective: Obj not found: %s"), *ObjectiveID.ToString());
+        UE_LOG(LogTemp, Warning, TEXT("MissionSubsystem:  ActivateObjective: Obj not found: %s"), *ObjectiveID.ToString());
         return nullptr;
     }
     return ObjDef;
@@ -305,13 +345,13 @@ void UMissionSubsystem::OnMissionAssetLoaded(FPrimaryAssetId LoadedId, FGameplay
 
     if (!MissionAsset)
     {
-        UE_LOG(LogTemp, Error, TEXT("StartMission: Failed to load asset for %s"), *MissionID.ToString());
+        UE_LOG(LogTemp, Error, TEXT("MissionSubsystem: StartMission: Failed to load asset for %s"), *MissionID.ToString());
         return;
     }
 
     // Cache it explicitly so it doesn't get garbage collected while active
     LoadedMissionAssets.Add(MissionID, MissionAsset);
-    UE_LOG(LogTemp, Log, TEXT("StartMission: Asset loaded. Starting logic for %s"), *MissionID.ToString());
+    UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: StartMission: Asset loaded. Starting logic for %s"), *MissionID.ToString());
 
 	//Initiate Runtime State
 	FMissionRuntimeState& MissionRt = ActiveMissions.FindOrAdd(MissionID);
@@ -319,7 +359,7 @@ void UMissionSubsystem::OnMissionAssetLoaded(FPrimaryAssetId LoadedId, FGameplay
 	MissionRt.MissionState = EProgressState::InProgress;
 	OnMissionStarted.Broadcast(MissionID);
 
-	UE_LOG(LogTemp, Log, TEXT("StartMission: Mission started: %s"), *MissionID.ToString());
+	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: StartMission: Mission started: %s"), *MissionID.ToString());
 
 	for (const UMissionObjective* Obj : MissionAsset->ObjectiveArray)
     {
@@ -366,9 +406,11 @@ void UMissionSubsystem::EmitActorEvent(AActor* SourceActor, FGameplayTag EventTa
 
 void UMissionSubsystem::ConsumeEventForObjective(FGameplayTag MissionID, const UMissionObjective* ObjDef, FObjectiveRuntimeState& ObjRt, FGameplayTag EventTag, AActor* SourceActor)
 {
+    UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Attempt to Consume Event For Objective"));
 
     if (ObjDef->OnEvent(MissionID, EventTag, SourceActor, ObjRt))
     {
+        UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Consuming Event For Objective"));
         // "Are you done?"
         if (ObjDef->IsComplete(ObjRt))
         {

@@ -31,6 +31,13 @@ public:
     UPROPERTY(EditDefaultsOnly, Category = "Setup|Menu")
     bool bShowMenu;
 
+    UPROPERTY(EditDefaultsOnly, Category = "Setup|Testing")
+    bool bTestMission = false;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Setup|Testing")
+    FGameplayTag TestMissionTag; 
+
+
 
     // The function the UI calls to start the game
     UFUNCTION(BlueprintCallable, Category = "Game Flow")

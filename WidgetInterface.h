@@ -23,6 +23,9 @@ public:
     void OnConfirm();
 
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "WidgetInterface|Commands")
+    void OnProgress();
+
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "WidgetInterface|Commands")
     void OnCancel(bool& bSuccess);
 
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "WidgetInterface|Rendering")

@@ -21,7 +21,8 @@ bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplay
         if (EventTag.MatchesTagExact(Req.RequiredEventTag))
         {
             // -- Unique Source Logic --
-            if (Req.RequireUniqueSources && IsValid(SourceActor))
+            bool bUniqueSource = Req.RequireUniqueSources && IsValid(SourceActor);
+            if (bUniqueSource)
             {
                 // Key: "StepID_Event_ActorName"
                 FString UniqueKey = FString::Printf(TEXT("%s_%s_%s"), 
@@ -95,7 +96,7 @@ bool UObjective_Sequence::IsComplete(const FObjectiveRuntimeState& ObjectiveRunt
 
 void UObjective_Sequence::RunStepActions(const TArray<TObjectPtr<UMissionAction>>& Actions, AActor* Context) const
 {
-    for (const auto& Action : Actions)
+    for (const UMissionAction* Action : Actions)
     {
         if (Action) Action->ExecuteAction(Context);
     }

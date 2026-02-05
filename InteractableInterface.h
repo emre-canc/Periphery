@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "Player/InteractionStructs.h"
+#include "Items/InteractableStructs.h"
 #include "InteractableInterface.generated.h"
 
 
@@ -17,32 +17,33 @@ class INSIDETFV03_API IInteractableInterface
 	GENERATED_BODY()
 
 public:
-	// --- MAIN ENTRY ---
+	// --- MAIN ENTRY ---	
 
 	/** Player inputs interact -> Object decides what happens */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact")
-	void Interact(AActor* Interactor, bool bHeldButton, EInteractorStates InteractorState);
+	void Interact(AActor* Interactor, EInteractInput InputType);
 
 	// --- OBJECT STATE NOTIFICATIONS ---
-
-	/** Tell the Object: "You are currently being carried (turn off physics)" */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Carry")
-	void NotifyCarriedActor(bool bIsCarried);
+	FHandAttachData GetCarryData();
 
-	/** Tell the Object: "You are currently being inspected (spin around)" */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Carry")
+	void IsThrowable(bool& bIsThrowable, UPrimitiveComponent*& ThrownComponent); 
+
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Inspect")
-	void NotifyInspectedActor(bool bIsInspected);
+	FInspectData GetInspectData();
+
+	// --- OBJECT STATE SETTERS ---
+
+	// "Hey Item, a specific interaction type just Started (true) or Ended (false)."
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|State")
+	void SetItemState(EInteractions InteractionType, bool bActive);
 
 	/** Enable/Disable interaction modes (e.g. Lock the door) */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|State")
 	void SetInteractModes(EInteractions InteractMode, bool bValue);
 
-	// --- DATA GETTERS ---
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Carry")
-	void IsThrowable(bool& bIsThrowable, UPrimitiveComponent*& ThrownComponent);
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Data")
-	void GetItemName(FText& ItemName);
 
 };

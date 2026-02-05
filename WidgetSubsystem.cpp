@@ -64,7 +64,7 @@ void UWidgetSubsystem::RegisterWidget(UUserWidget* Widget, EWidgetLayer Layer, E
     }
     else
     {
-        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: [%s] is GameOnly (Toast). Skipping Stack."), *Widget->GetName());
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: [%s] is GameOnly . Skipping Stack."), *Widget->GetName());
     }
 
     // 6. Refresh State
@@ -97,8 +97,15 @@ void UWidgetSubsystem::UnregisterWidget(UUserWidget* Widget)
 
 void UWidgetSubsystem::RefreshState()
 {
+    // [DEBUG] Entry Log
+    UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: RefreshState() Called."));
+
     APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-    if (!PC) return;
+    if (!PC)
+    {
+        UE_LOG(LogTemp, Error, TEXT("WidgetSubsystem: RefreshState FAILED - No PlayerController."));
+        return;
+    }
 
     // --- 1. SETUP ENHANCED INPUT ---
     UEnhancedInputLocalPlayerSubsystem* EISubsystem = nullptr;
@@ -124,23 +131,32 @@ void UWidgetSubsystem::RefreshState()
         }
     }
 
+    // [DEBUG] Check Stack Size
+    int32 CurrentStackSize = MenuStack.Num();
+    UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: Current MenuStack Size = %d"), CurrentStackSize);
+
     // --- SCENARIO A: STACK EMPTY (Gameplay) ---
     if (MenuStack.IsEmpty())
     {
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: Scenario A (Gameplay) - Stack Empty. Restoring Controls."));
+
         SetHUDVisibility(true);
 
         // Unpause
         UGameplayStatics::SetGamePaused(GetWorld(), false);
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: Game Unpaused."));
 
         // Restore Input
-        PC->SetIgnoreMoveInput(false);
-        PC->SetIgnoreLookInput(false);
+        PC->ResetIgnoreMoveInput();
+        PC->ResetIgnoreLookInput();
         PC->SetShowMouseCursor(false);
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: Input Restored (Move: ON, Look: ON, Mouse Cursor: OFF)."));
         
 
         // Input Mode
         FInputModeGameOnly InputMode;
         PC->SetInputMode(InputMode);
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: SetInputMode -> GameOnly."));
 
         // Remove UI IMC
         if (EISubsystem && UI_IMC)
@@ -153,6 +169,8 @@ void UWidgetSubsystem::RefreshState()
     // --- SCENARIO B: MENUS OPEN ---
     else
     {
+        UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: Scenario B (UI Mode) - Stack Has Widgets."));
+
         // Add UI IMC
         if (EISubsystem && UI_IMC)
         {
@@ -164,23 +182,40 @@ void UWidgetSubsystem::RefreshState()
         UUserWidget* TopWidget = MenuStack.Last().Get();
         FWidgetData Data;
         
-        if (TopWidget && ActiveWidgets.Contains(TopWidget))
+        if (TopWidget)
         {
-            Data = ActiveWidgets[TopWidget];
+            UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: Top Widget Name: %s"), *TopWidget->GetName());
+
+            if (ActiveWidgets.Contains(TopWidget))
+            {
+                Data = ActiveWidgets[TopWidget];
+            }
+            else
+            {
+                UE_LOG(LogTemp, Error, TEXT("WidgetSubsystem: CRITICAL - Top Widget '%s' is in Stack but NOT in ActiveWidgets Map! Data will be default."), *TopWidget->GetName());
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("WidgetSubsystem: CRITICAL - Top Widget in Stack is NULL (Pending Kill?)."));
         }
 
         // Apply Pause
         UGameplayStatics::SetGamePaused(GetWorld(), Data.bPauseGame);
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: SetGamePaused -> %s"), Data.bPauseGame ? TEXT("TRUE") : TEXT("FALSE"));
 
         // Apply Input Blocking (Hard Block)
         PC->SetIgnoreMoveInput(true);
         PC->SetIgnoreLookInput(true);
+        UE_LOG(LogTemp, Warning, TEXT("WidgetSubsystem: Input Blocked (Move: OFF, Look: OFF)."));
+
         SetHUDVisibility(false); 
 
         EMouseLockMode LockMode = Data.bShowMouseCursor ? EMouseLockMode::DoNotLock : EMouseLockMode::LockAlways;
 
         if (Data.InputMode == EWidgetInputMode::UIOnly)
         {
+            UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: Setting InputMode -> UIOnly."));
             FInputModeUIOnly InputMode;
             if (TopWidget  && Data.bShowMouseCursor) InputMode.SetWidgetToFocus(TopWidget->TakeWidget());
             InputMode.SetLockMouseToViewportBehavior(LockMode);
@@ -188,6 +223,7 @@ void UWidgetSubsystem::RefreshState()
         }
         else // GameAndUI (Fallback / Interactive)
         {
+            UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: Setting InputMode -> GameAndUI."));
             FInputModeGameAndUI InputMode;
             if (TopWidget && Data.bShowMouseCursor) InputMode.SetWidgetToFocus(TopWidget->TakeWidget());
             InputMode.SetLockMouseToViewportBehavior(LockMode);
@@ -195,6 +231,7 @@ void UWidgetSubsystem::RefreshState()
         }
         // Apply ShowMouseCursor after SetWidgetToFocus
         PC->SetShowMouseCursor(Data.bShowMouseCursor);
+        UE_LOG(LogTemp, Log, TEXT("WidgetSubsystem: Mouse Cursor -> %s"), Data.bShowMouseCursor ? TEXT("TRUE") : TEXT("FALSE"));
     }
 }
 

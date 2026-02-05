@@ -9,6 +9,22 @@
 void APeripheryGameMode::BeginPlay()
 {
     Super::BeginPlay();
+
+    if (bTestMission)
+    {
+        UPeripheryGameInstance* GI = Cast<UPeripheryGameInstance>(GetGameInstance());
+        if (GI) 
+        {
+            if (UMissionSubsystem* MissionSys = GI->GetSubsystem<UMissionSubsystem>())
+            {
+                // Wipe old state to be safe, then start mission
+                MissionSys->ResetSystem(); 
+                MissionSys->StartMission(TestMissionTag);
+            }
+        }
+        return;
+    }
+
     if (!bShowMenu) return;
     UPeripheryGameInstance* GI = Cast<UPeripheryGameInstance>(GetGameInstance());
     APlayerController* PC = GetWorld()->GetFirstPlayerController();

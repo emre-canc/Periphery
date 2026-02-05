@@ -2,8 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "Animation/AnimMontage.h"
-#include "Player/InteractionStructs.h"
+#include "GameplayTagContainer.h"
+#include "Player/InteractorStructs.h"
 #include "InteractorInterface.generated.h"
 
 
@@ -22,28 +22,34 @@ public:
 	// --- ACTIONS THE PLAYER DOES ---
 
 	/** Command the Player to attach 'ActorToCarry' to their 'AttachSocket' */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Carry")
-	void CarryActor(AActor* ActorToCarry, FName AttachSocket,
-		UAnimMontage* CarryMontage, EInteractorStates CarryType, bool bKeepRelativeScale);
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Carry")
+	void CarryActor(AActor* ActorToCarry);
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Carry")
-	void DropActor();
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Carry")
+	void DropActor(bool bDestroyActor = false);
 
 	/** Command the Player to open their Inspection UI for 'ActorToInspect' */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Inspect")
-	void InspectActor(AActor* ActorToInspect, const FText& Name, const FText& Description,
-		bool bIsReadable, bool bAutoRead, const FText& NoteText, FTransform InspectTransform);
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Inspect")
+	void InspectActor(AActor* ActorToInspect);
 
-	//Change interactor state (Busy, Carrying, Inspecting, Etc.)
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|State")
 	void SetInteractorState(EInteractorStates NewState);
 
 	// --- STATE QUERIES ---
 
 	/** Ask the Player what they are currently doing (Idle, Carrying, etc.) */
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Query")
 	EInteractorStates GetInteractorState();
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interact|Data")
-	void GetInteractHitResult(FHitResult& HitResult);
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Query")
+	FGameplayTag GetEquippedItemTag();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Query")
+	USceneComponent* GetViewAnchor();
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Query|Trace")
+	void InteractorLineTrace(FHitResult& HitResult, bool& ReturnValue); // make this somehow a part of primary action.
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Interactor|Query|Trace")
+	void GetTraceHitResult(FHitResult& HitResult);
 };
