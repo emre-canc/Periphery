@@ -1,4 +1,4 @@
-// Objective_Simple.h
+// Periphery -- EvEGames -- Objective_Simple.h
 #pragma once
 #include "CoreMinimal.h"
 #include "MissionObjective.h"
@@ -12,6 +12,12 @@ public:
 
     UPROPERTY(EditAnywhere, Category = "Rules")
     FGameplayTag TargetEvent;
+
+    UPROPERTY(EditAnywhere, Category = "Rules")
+    bool bCountPastEvents = false;
+
+
+    virtual void InitializeRuntime(FObjectiveRuntimeState& RuntimeState) const override;
     
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;
     

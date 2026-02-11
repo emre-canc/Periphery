@@ -2,7 +2,6 @@
 
 #include "Subsystems/MissionSubsystem.h"
 #include "Core/PeripherySaveGame.h"
-
 #include "Engine/AssetManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/OutputDeviceNull.h"
@@ -383,6 +382,18 @@ void UMissionSubsystem::EmitActorEvent(AActor* SourceActor, FGameplayTag EventTa
 {
     if (!EventTag.IsValid()) return;
 
+    if (SourceActor)
+    {
+        // 1. Get the Wrapper Struct first
+        FActorSet& SetStruct = EventHistoryDB.FindOrAdd(EventTag);
+
+        // 2. Then get the Set from inside it
+        TSet<FName>& ActorSet = SetStruct.ActorNames;
+        
+        // 3. Add the new Actor to the set.
+        ActorSet.Add(SourceActor->GetFName());
+    }
+
     OnMissionEventBroadcast.Broadcast(EventTag);
 
     // Broadcaster: Send to all active objectives
@@ -419,7 +430,23 @@ void UMissionSubsystem::ConsumeEventForObjective(FGameplayTag MissionID, const U
     }
 }
 
+int32 UMissionSubsystem::GetEventCount(FGameplayTag EventTag)
+{
+    if (const FActorSet* SetStruct = EventHistoryDB.Find(EventTag))
+    {
+        return SetStruct->ActorNames.Num();
+    }
+    return 0;
+}
 
+bool UMissionSubsystem::HasActorDoneEvent(AActor* Actor, FGameplayTag EventTag) 
+{
+   if (FActorSet* SetStruct = EventHistoryDB.Find(EventTag))
+   {
+        if (SetStruct->ActorNames.Find(Actor->GetFName())) return true;
+   }
+   return false;
+}
 
 // ---------- Runtime getters ----------
 
@@ -470,6 +497,7 @@ void UMissionSubsystem::SaveToGame(UPeripherySaveGame* SaveObject)
     // Unreal handles the struct serialization automatically.
     SaveObject->ActiveMissions = ActiveMissions;
     SaveObject->CompletedMissions = CompletedMissions;
+    SaveObject->EventHistoryDB = EventHistoryDB;
     
     UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Data Saved to Object"));
 }
@@ -485,6 +513,7 @@ void UMissionSubsystem::LoadFromGame(const UPeripherySaveGame* SaveObject)
     // 2. Copy data back
     ActiveMissions = SaveObject->ActiveMissions;
     CompletedMissions = SaveObject->CompletedMissions;
+    EventHistoryDB = SaveObject->EventHistoryDB;
 
     // 3. CRITICAL: Restore Asset Pointers
     // The SaveFile knows the Tags ("Mission.ShiftStart") but it does NOT store the Asset Pointers.

@@ -4,11 +4,11 @@
 
 
 bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
-    AActor* SourceActor, FObjectiveRuntimeState& ObjectiveRuntime) const 
+    AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const 
 {
     // 1. Get Current Step Index (Default 0)
     FName IndexKey("CurrentStepIndex");
-    int32 Index = ObjectiveRuntime.IntStorage.FindRef(IndexKey);
+    int32 Index = RuntimeState.IntStorage.FindRef(IndexKey);
 
     if (!Steps.IsValidIndex(Index)) return false;
 
@@ -30,9 +30,9 @@ bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplay
                     *Req.RequiredEventTag.ToString(), 
                     *SourceActor->GetName());
 
-                if (ObjectiveRuntime.StringStorage.Contains(UniqueKey)) continue; // Already counted
+                if (RuntimeState.StringStorage.Contains(UniqueKey)) continue; // Already counted
                 
-                ObjectiveRuntime.StringStorage.Add(UniqueKey);
+                RuntimeState.StringStorage.Add(UniqueKey);
             }
 
             // -- Increment Counter --
@@ -42,8 +42,8 @@ bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplay
                 *Req.RequiredEventTag.ToString());
             FName CountKey(*CountKeyStr);
 
-            int32 CurrentCount = ObjectiveRuntime.IntStorage.FindRef(CountKey);
-            ObjectiveRuntime.IntStorage.Add(CountKey, ++CurrentCount);
+            int32 CurrentCount = RuntimeState.IntStorage.FindRef(CountKey);
+            RuntimeState.IntStorage.Add(CountKey, ++CurrentCount);
             bStepProgressed = true;
         }
     }
@@ -58,7 +58,7 @@ bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplay
             *CurrentStep.StepID.ToString(), 
             *Req.RequiredEventTag.ToString());
         
-        if (ObjectiveRuntime.IntStorage.FindRef(*CountKeyStr) < Req.NumberOfTimesEventMustOccur)
+        if (RuntimeState.IntStorage.FindRef(*CountKeyStr) < Req.NumberOfTimesEventMustOccur)
         {
             bStepComplete = false;
             break;
@@ -72,7 +72,7 @@ bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplay
 
         // 2. Advance Index
         int32 NextIndex = Index + 1;
-        ObjectiveRuntime.IntStorage.Add(IndexKey, NextIndex);
+        RuntimeState.IntStorage.Add(IndexKey, NextIndex);
 
         // 3. Run Start Actions for the NEW step (if it exists)
         if (Steps.IsValidIndex(NextIndex))
@@ -86,10 +86,10 @@ bool UObjective_Sequence::OnEvent(const FGameplayTag& MissionID, const FGameplay
 }
 
 
-bool UObjective_Sequence::IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const 
+bool UObjective_Sequence::IsComplete(const FObjectiveRuntimeState& RuntimeState) const 
 {
     // Done if Index has moved past the last step
-    int32 Index = ObjectiveRuntime.IntStorage.FindRef("CurrentStepIndex");
+    int32 Index = RuntimeState.IntStorage.FindRef("CurrentStepIndex");
     return Index >= Steps.Num();
 }
 

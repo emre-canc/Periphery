@@ -1,3 +1,4 @@
+// Periphery -- EvEGames
 
 #pragma once
 
@@ -47,6 +48,9 @@ class INSIDETFV03_API UPeripherySaveGame : public USaveGame
     // --- World State ---
     UPROPERTY(VisibleAnywhere, Category = "SaveData|World")
     TArray<FName> ActiveDataLayers; 
+
+    UPROPERTY(VisibleAnywhere, Category = "SaveData|World")
+	TMap<FGameplayTag, FActorSet> EventHistoryDB;
 
     // --- Actor Registry ---
     // Maps a specific Object ID (GUID)

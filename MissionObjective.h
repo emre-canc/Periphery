@@ -1,3 +1,5 @@
+// Periphery -- EvEGames
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -43,6 +45,7 @@ public:
 
     // --- Objective Rules  ---
     //Implemented in child classes
+
  
     // --- Objective Completion ---
 
@@ -61,13 +64,13 @@ public:
         { RuntimeState.ObjectiveState = EProgressState::InProgress; }
 
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, 
-        AActor* SourceActor, FObjectiveRuntimeState& ObjectiveRuntime) const { return false; }
+        AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const { return false; }
 
     /** Called when ANY other objective in the mission is completed. */
     virtual bool OnObjectiveCompleted(const FGameplayTag& CompletedObjectiveID,
         FObjectiveRuntimeState& RuntimeState) const {    return false;  } 
 
-    virtual bool IsComplete(const FObjectiveRuntimeState& ObjectiveRuntime) const { return false; }     // Child classes can override this for custom code-based completion checks
+    virtual bool IsComplete(const FObjectiveRuntimeState& RuntimeState) const { return false; }     // Child classes can override this for custom code-based completion checks
 
 	
 };

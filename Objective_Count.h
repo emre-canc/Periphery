@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// Periphery -- EvEGames
 
 #pragma once
 
@@ -24,8 +24,14 @@ public:
     UPROPERTY(EditAnywhere, Category = "Rules")
     bool bRequireUniqueSources = false;
 
+    UPROPERTY(EditAnywhere, Category = "Rules")
+    bool bCountPastEvents = false;
+
+    virtual void InitializeRuntime(FObjectiveRuntimeState& RuntimeState) const override;
+
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;
     
     virtual bool IsComplete(const FObjectiveRuntimeState& RuntimeState) const override;
+
 };
    

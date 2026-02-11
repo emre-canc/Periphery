@@ -83,3 +83,12 @@ struct FMissionRuntimeState
 	UPROPERTY(BlueprintReadWrite, Category="Runtime")
 	TSet<FGameplayTag> CompletedObjectiveIDs; 
 };
+
+USTRUCT(BlueprintType)
+struct FActorSet
+{
+    GENERATED_BODY()
+
+    UPROPERTY(SaveGame)
+    TSet<FName> ActorNames;
+};

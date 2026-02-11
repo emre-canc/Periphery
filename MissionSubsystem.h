@@ -1,5 +1,6 @@
-#pragma once
+// Periphery -- EvEGames -- MissionSubsystem.h
 
+#pragma once
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "Missions/MissionStructs.h"
@@ -85,6 +86,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Mission|Events")
 	void EmitActorEvent(AActor* SourceActor, FGameplayTag EventTag);
 
+	// Helper for Objectives to check history, returns the number of unique actors that have emitted given event.
+    UFUNCTION(BlueprintCallable, Category="Mission|Events")
+    int32 GetEventCount(FGameplayTag EventTag);
+
+	UFUNCTION(BlueprintCallable, Category="Mission|Events")
+	bool HasActorDoneEvent(AActor* Actor, FGameplayTag EventTag);
+
 	// Save System
 	UFUNCTION(BlueprintCallable, Category = "SaveSystem")
 	void SaveToGame(UPeripherySaveGame* SaveObject);
@@ -98,7 +106,6 @@ public:
 protected:
 
 	// ---------- Missions ----------
-			
 	FMissionRuntimeState* GetActiveMissionRuntime(FGameplayTag MissionID);
 	const FMissionRuntimeState* GetActiveMissionRuntime(FGameplayTag MissionID) const;
 
@@ -108,17 +115,21 @@ protected:
 	const UMissionData* GetMissionAsset(FGameplayTag MissionID) const;
 
 	// ---------- Objectives ----------
-
 	FObjectiveRuntimeState* GetObjectiveRuntime(FGameplayTag MissionID, FGameplayTag ObjectiveID);
 	const FObjectiveRuntimeState* GetObjectiveRuntime(FGameplayTag MissionID, FGameplayTag ObjectiveID) const;
 
 	const UMissionObjective* GetObjectiveFromAsset(FGameplayTag MissionID, FGameplayTag ObjectiveID) const;
+	void ActivateNextObjectives(FGameplayTag MissionID, const TArray<FGameplayTag>& NextObjectiveIDs);
 
 	// ---------- Event Bus ----------
 	void ConsumeEventForObjective(FGameplayTag MissionID, const UMissionObjective* ObjDef,
 		 	FObjectiveRuntimeState& ObjRt, FGameplayTag EventTag, AActor* SourceActor);
-	void ActivateNextObjectives(FGameplayTag MissionID, const TArray<FGameplayTag>& NextObjectiveIDs);
 
+	// Map of <EventTag, Set of Actor Unique Names>
+	UPROPERTY(VisibleAnywhere, Category="Mission|Events")
+	TMap<FGameplayTag, FActorSet> EventHistoryDB;
+	
+	// ---------- Actions ----------
 	void RunActions(const TArray<TObjectPtr<UMissionAction>>& Actions, AActor* ContextActor); 
 
 

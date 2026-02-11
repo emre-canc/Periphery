@@ -1,3 +1,5 @@
+// Periphery -- EvEGames
+
 #pragma once
 #include "CoreMinimal.h"
 #include "MissionObjective.h"
@@ -11,6 +13,11 @@ class INSIDETFV03_API UObjective_Checklist : public UMissionObjective
 public:
     UPROPERTY(EditAnywhere, Category = "Rules")
     TArray<FGameplayTag> RequiredTags;
+
+    UPROPERTY(EditAnywhere, Category = "Rules")
+    bool bCountPastEvents = false;
+
+    virtual void InitializeRuntime(FObjectiveRuntimeState& RuntimeState) const override;
 
     virtual bool OnEvent(const FGameplayTag& MissionID, const FGameplayTag& EventTag, AActor* SourceActor, FObjectiveRuntimeState& RuntimeState) const override;
     
